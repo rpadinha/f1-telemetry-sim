@@ -85,14 +85,13 @@ void update_draw_hud(sf::RenderWindow& window, sf::Text& txt_telemetry, sf::Text
 
     char buf_tel[512];
     snprintf(buf_tel, sizeof(buf_tel),
-        "Sim: %.2f km/h\n"
         "Action: %s\n"
         "MGU-K: %.2f MJ\n"
         "Sim Speed: %.1fx\n\n"
         "--- TRACK ---\n"
         "Seg: %d / %lu\n"
         "Radius: %s",
-        sim_speed_kmh, action_str.c_str(), 
+        action_str.c_str(), 
         car.battery_mj, sim_speed,
         car.current_seg, track.size(),
         (track[car.current_seg].radius_m >= 10000.f) ? "STRAIGHT" : std::to_string((int)track[car.current_seg].radius_m).c_str());

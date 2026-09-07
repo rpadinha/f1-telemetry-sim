@@ -3,7 +3,6 @@
 A high-performance Formula 1 simulation engine developed in C++ and CUDA. This project features a custom physics solver and real-time telemetry visualization using SFML, designed to simulate vehicle dynamics across thousands of concurrent setups and compare theoretical racing logic against real-world track telemetry.
 
 <img width="1330" height="807" alt="image" src="https://github.com/user-attachments/assets/3f0d0f8d-5904-47a6-ad76-42d635c1dda3" />
-*(SFML Visualizer rendering real-time pedal inputs, RPM, speed deltas, and track position)*
 
 ## Key Features
 
@@ -20,6 +19,13 @@ A high-performance Formula 1 simulation engine developed in C++ and CUDA. This p
 *   **Core Logic:** C++
 *   **Parallel Computing:** CUDA (NVIDIA)
 *   **Graphics & UI:** SFML (Simple and Fast Multimedia Library)
+
+## Future Ideas
+
+* **Battery Deplyment Maps** Deployment maps or just a better deployment system
+* **Maybe full race simulations?** Adding fuel usage and management, tyre usage and management, could adda depth for full race simulations although pit stops seem difficult to add since fastF1 doesnt have pit stop data
+* **Better visualization** maybe some graphs and a better comparison visualization
+* **Perfect car mechanics and simulation** Right now, observing the comparison of Monza 2025 Q3 run made by verstappen, some 
 
 ## Environment and Requirements
 
