@@ -13,11 +13,11 @@ find_package(SFML 2.6 COMPONENTS graphics window system REQUIRED)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(f1_solver
+add_executable(f1-telemetry-sim
     src/physics.cu
     src/circuit_loader.cpp
     src/visualizer.cpp
     src/main.cpp 
 )
 
-target_link_libraries(f1_solver sfml-graphics sfml-window sfml-system)
+target_link_libraries(f1-telemetry-sim sfml-graphics sfml-window sfml-system)
