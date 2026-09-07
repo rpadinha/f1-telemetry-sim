@@ -37,4 +37,4 @@ A high-performance Formula 1 simulation engine developed in C++ and CUDA. This p
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/RupiX71/f1-telemetry-sim.git](https://github.com/RupiX71/f1-telemetry-sim.git)
+   git clone https://github.com/rpadinha/f1-telemetry-sim.git
