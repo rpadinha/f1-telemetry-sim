@@ -2,7 +2,7 @@
 
 A high-performance Formula 1 simulation engine developed in C++ and CUDA. This project features a custom physics solver and real-time telemetry visualization using SFML, designed to simulate vehicle dynamics across thousands of concurrent setups and compare theoretical racing logic against real-world track telemetry.
 
-add here
+<img width="1330" height="807" alt="image" src="https://github.com/user-attachments/assets/3f0d0f8d-5904-47a6-ad76-42d635c1dda3" />
 *(SFML Visualizer rendering real-time pedal inputs, RPM, speed deltas, and track position)*
 
 ## Key Features
