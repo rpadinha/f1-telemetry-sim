@@ -37,7 +37,7 @@ rpm_interp = pchip_interpolate(distancia_original, tel["RPM"].to_numpy(), distan
 # nGear goes from 1 to 8, so we can round the interpolated values to the nearest integer
 gear_interp = np.round(pchip_interpolate(distancia_original, tel["nGear"].to_numpy(), distancia_uniforme)).astype(int)
 throttle_pedal_interp = np.round(pchip_interpolate(distancia_original, tel["Throttle"].to_numpy(), distancia_uniforme))
-brake_pedal_interp = np.round(pchip_interpolate(distancia_original, tel["Throttle"].to_numpy(), distancia_uniforme))
+brake_pedal_interp = np.round(pchip_interpolate(distancia_original, tel["Brake"].to_numpy(), distancia_uniforme))
 
 df = pd.DataFrame({
     "Distance": distancia_uniforme,
@@ -50,6 +50,9 @@ df = pd.DataFrame({
     "Throttle": throttle_pedal_interp,
     "Brake": brake_pedal_interp
 })
+
+df["Throttle"] = df["Throttle"] / 100
+df["Brake"] = df["Brake"] / 100
 
 # Track Rotation
 circuit_info = session.get_circuit_info()

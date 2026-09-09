@@ -23,10 +23,13 @@ int main() {
     std::vector<CarSetup> setups(Config::NUM_SETUPS);
     std::vector<SimResult> results(Config::NUM_SETUPS);
 
+
+    // after getting the battery and fixing some imperfections as to not taking the Z of the track, we will 
+    // see different ways to change setups*
     std::mt19937 gen(888); 
     std::uniform_real_distribution<float> ice_dist(380.0f, 420.0f);
     std::uniform_real_distribution<float> mguk_dist(300.0f, 350.0f);
-    std::uniform_real_distribution<float> drag_dist(0.9f, 1.5f);
+    std::uniform_real_distribution<float> drag_dist(0.7f, 1.5f);
 
     for(int i = 0 ; i < Config::NUM_SETUPS ; ++i) {
         setups[i].id = i;

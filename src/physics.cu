@@ -49,7 +49,41 @@ __host__ __device__ void update_transmission(F1Car* car) {
     }
 }
 
-__host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* setup, const TrackSegment* track, float dt) {
+// mguk deployment
+__host__ __device__ float calculate_mguk_deployment(F1Car* car, const TrackSegment* track, int num_segments) {
+    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || track[car->current_seg].radius_m < 10000.f) {
+        return 0.0f;
+    }
+
+    float upcoming_straight_m = track[car->current_seg].length_m - car->current_m;
+    int lookahead = (car->current_seg + 1) % num_segments;
+    
+    // one of the issues here right now is if a straight has some less than a 10000 value because some straights are not fully straight 
+    // it will stop in the middle of the straight 
+    while (track[lookahead].radius_m >= 10000.0f && upcoming_straight_m < 2500.0f) {
+        upcoming_straight_m += track[lookahead].length_m;
+        lookahead = (lookahead + 1) % num_segments;
+    }
+
+    float ratio = 0.0f;
+    if (upcoming_straight_m > 800.f) {
+        ratio = 1.0f;
+    } else if (upcoming_straight_m > 400.f) {
+        ratio = 0.5f;
+    } else {
+        ratio = 0.2f;
+    }
+
+    if (car->v*3.6f > 320.0f) {
+        ratio *= 0.7f;
+    }
+    if (car->v*3.6f > 340.0f) {
+        ratio *= 0.2f;
+    }
+    return ratio;
+}
+
+__host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
     float drag_force = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * setup->drag_coef * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
     float max_grip = (setup->mass_kg * Config::GRAVITY + downforce) * Config::BASE_MECH_GRIP;
@@ -99,11 +133,15 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
             float rpm_factor = 1.0f - (rpm_diff * rpm_diff);
             if (rpm_factor < 0.2f) rpm_factor = 0.2f;
             float current_power_kw = setup->ice_power_kw * rpm_factor;
-            // This part needs a battery management system more refined
-            if (car->battery_mj > 0.0f && car->v > 60.0f && !(track[car->current_seg].radius_m < 10000.0f)) {
-                current_power_kw += setup->mguk_power_kw;
-                car->battery_mj -= (setup->mguk_power_kw * dt) / 1000.0f;
+
+            float mguk_ratio = calculate_mguk_deployment(car, track, num_segments);
+
+            if (mguk_ratio > 0.0f) {
+                float power_to_add = setup->mguk_power_kw * mguk_ratio;
+                current_power_kw += power_to_add;
+                car->battery_mj -= (power_to_add * dt) / 1000.0f;
             }
+
             float safe_rpm = car->rpm;
             if (safe_rpm < 4000.0f) safe_rpm = 4000.0f;
             // TORQUE mechanics Prevents the division-by-zero or division-by-one stability issues at low speeds
@@ -150,7 +188,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
         car->action = DriverAction::ACCELERATE;
     }
 
-    float net_force = apply_pedals_and_forces(car, setup, track, dt);
+    float net_force = apply_pedals_and_forces(car, setup, track, num_segments, dt);
 
     float a = net_force / setup->mass_kg;
     car->v += a * dt;
@@ -180,9 +218,9 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.current_gear = track[0].real_gear;
         car.current_seg = 0;
         car.time_s = 0.0f;
-        car.qualifying_mode = false; // Assuming qualifying mode is true for all setups initially
-        car.throttle_pedal = 0.0f;
-        car.brake_pedal = 0.0f;
+        car.qualifying_mode = false;
+        car.throttle_pedal = track[0].real_throttle_pedal;
+        car.brake_pedal = track[0].real_brake_pedal;
         
         float t = 0.0f;
         float dt = 0.002f;

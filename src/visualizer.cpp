@@ -15,6 +15,12 @@ struct TrackRenderData {
     sf::VertexArray track_lines;
 };
 
+enum class HudMode {
+    AI_ONLY = 0,
+    REAL_ONLY = 1,
+    COMPARISON = 2
+};
+
 TrackRenderData build_track_shapes(const std::vector<TrackSegment>& track) {
     TrackRenderData data;
     data.track_lines.setPrimitiveType(sf::LineStrip);
@@ -59,39 +65,43 @@ void reset_car_state(F1Car& car, const std::vector<TrackSegment>& track) {
     car.current_seg = 0;
     car.current_m = 0.0f;
     car.time_s = 0.0f;
-    car.qualifying_mode = true;
-    car.throttle_pedal = 0.0f;
-    car.brake_pedal = 0.0f;
+    car.qualifying_mode = false;
+    car.throttle_pedal = track[0].real_throttle_pedal;
+    car.brake_pedal = track[0].real_brake_pedal;
     car.action = DriverAction::ACCELERATE;
 }
 
 void update_draw_hud(sf::RenderWindow& window, sf::Text& txt_telemetry, sf::Text& txt_timings,
                      const F1Car& car, const std::vector<TrackSegment>& track, 
                      float s1, float s2, float s3, float last_lap_time, float sim_speed, 
-                     const sf::Font& font) { // <-- Recebe a fonte e a pista
+                     const sf::Font& font, HudMode mode) { 
 
     float width = window.getSize().x;
     float height = window.getSize().y;
     
-    // 1. Textos Base (Os teus originais)
-    std::string action_str;
-    switch(car.action) {
-        case DriverAction::BRAKE: action_str = "Brakes(" + std::to_string(static_cast<int>(car.brake_pedal * 100)) + "%)"; break;
-        case DriverAction::COAST: action_str = "Lift"; break;
-        case DriverAction::ACCELERATE: action_str = "Throttle(" + std::to_string(static_cast<int>(car.throttle_pedal * 100)) + "%)"; break;
+    float real_throttle = track[car.current_seg].real_throttle_pedal;
+    float real_brake = track[car.current_seg].real_brake_pedal;
+    
+    std::string mode_title;
+    switch(mode) {
+        case HudMode::AI_ONLY: mode_title = "MODE: SIM DRIVER"; break;
+        case HudMode::REAL_ONLY: mode_title = "MODE: REAL DRIVER"; break;
+        case HudMode::COMPARISON: mode_title = "MODE: COMPARISON (SIM-Solid) (REAL-Outline)"; break;
     }
 
     float sim_speed_kmh = car.v * 3.6f;
+    float delta_speed = sim_speed_kmh - track[car.current_seg].real_speed_kmh;
+    float delta_rpm = car.rpm - track[car.current_seg].real_rpm;
 
     char buf_tel[512];
     snprintf(buf_tel, sizeof(buf_tel),
-        "Action: %s\n"
+        "%s\n\n"
         "MGU-K: %.2f MJ\n"
         "Sim Speed: %.1fx\n\n"
         "--- TRACK ---\n"
         "Seg: %d / %lu\n"
-        "Radius: %s",
-        action_str.c_str(), 
+        "Radius: %s\n",
+        mode_title.c_str(),
         car.battery_mj, sim_speed,
         car.current_seg, track.size(),
         (track[car.current_seg].radius_m >= 10000.f) ? "STRAIGHT" : std::to_string((int)track[car.current_seg].radius_m).c_str());
@@ -108,7 +118,6 @@ void update_draw_hud(sf::RenderWindow& window, sf::Text& txt_telemetry, sf::Text
         s1, s2, s3, car.time_s, last_lap_time);
     txt_timings.setString(buf_timing);
 
-    // 2. Gráficos: Pedais (Canto Inferior Esquerdo)
     float pedal_w = 30.f;
     float pedal_h = 100.f;
     float base_x = 20.f;
@@ -122,44 +131,90 @@ void update_draw_hud(sf::RenderWindow& window, sf::Text& txt_telemetry, sf::Text
     throttle_bg.setPosition(base_x + 40.f, base_y);
     throttle_bg.setFillColor(sf::Color(50, 50, 50, 200));
 
-    sf::RectangleShape brake_fill(sf::Vector2f(pedal_w, -(pedal_h * car.brake_pedal)));
-    brake_fill.setPosition(base_x, base_y);
-    brake_fill.setFillColor(sf::Color(220, 50, 50)); 
+    window.draw(txt_telemetry);
+    window.draw(txt_timings);
+    window.draw(brake_bg);
+    window.draw(throttle_bg);
 
-    sf::RectangleShape throttle_fill(sf::Vector2f(pedal_w, -(pedal_h * car.throttle_pedal)));
-    throttle_fill.setPosition(base_x + 40.f, base_y);
-    throttle_fill.setFillColor(sf::Color(50, 220, 50)); 
+    if (mode == HudMode::AI_ONLY || mode == HudMode::COMPARISON) {
+        sf::RectangleShape brake_fill(sf::Vector2f(pedal_w, -(pedal_h * car.brake_pedal)));
+        brake_fill.setPosition(base_x, base_y);
+        brake_fill.setFillColor(sf::Color(220, 50, 50)); 
 
-    // 3. Gráficos: Conta-Rotações (Centro Fundo)
+        sf::RectangleShape throttle_fill(sf::Vector2f(pedal_w, -(pedal_h * car.throttle_pedal)));
+        throttle_fill.setPosition(base_x + 40.f, base_y);
+        throttle_fill.setFillColor(sf::Color(50, 220, 50)); 
+        
+        window.draw(brake_fill);
+        window.draw(throttle_fill);
+    }
+
+    if (mode == HudMode::REAL_ONLY || mode == HudMode::COMPARISON) {
+        sf::RectangleShape real_brake_fill(sf::Vector2f(pedal_w, -(pedal_h * real_brake)));
+        real_brake_fill.setPosition(base_x, base_y);
+        
+        sf::RectangleShape real_throttle_fill(sf::Vector2f(pedal_w, -(pedal_h * real_throttle)));
+        real_throttle_fill.setPosition(base_x + 40.f, base_y);
+        
+        if (mode == HudMode::COMPARISON) {
+            real_brake_fill.setFillColor(sf::Color::Transparent);
+            real_brake_fill.setOutlineThickness(-2.f);
+            real_brake_fill.setOutlineColor(sf::Color::White);
+            
+            real_throttle_fill.setFillColor(sf::Color::Transparent);
+            real_throttle_fill.setOutlineThickness(-2.f);
+            real_throttle_fill.setOutlineColor(sf::Color::White);
+        } else {
+            real_brake_fill.setFillColor(sf::Color(255, 140, 0)); 
+            real_throttle_fill.setFillColor(sf::Color(0, 200, 255));
+        }
+        
+        window.draw(real_brake_fill);
+        window.draw(real_throttle_fill);
+    }
+
     float hud_x = width / 2.0f - 200.f;
     float hud_y = height - 50.f;
 
     sf::RectangleShape rpm_bg(sf::Vector2f(400.f, 20.f));
     rpm_bg.setPosition(hud_x, hud_y);
     rpm_bg.setFillColor(sf::Color(50, 50, 50, 200));
+    window.draw(rpm_bg);
 
-    float rpm_pct = std::min(car.rpm / 12500.0f, 1.0f);
-    sf::RectangleShape rpm_fill(sf::Vector2f(400.f * rpm_pct, 20.f));
-    rpm_fill.setPosition(hud_x, hud_y);
-    rpm_fill.setFillColor(car.rpm > 11800.0f ? sf::Color::Red : sf::Color::Green);
+    if (mode == HudMode::AI_ONLY || mode == HudMode::COMPARISON) {
+        float rpm_pct = std::min(car.rpm / 12500.0f, 1.0f);
+        sf::RectangleShape rpm_fill(sf::Vector2f(400.f * rpm_pct, 20.f));
+        rpm_fill.setPosition(hud_x, hud_y);
+        rpm_fill.setFillColor(car.rpm > 11800.0f ? sf::Color::Red : sf::Color::Green);
+        window.draw(rpm_fill);
+    }
+
+    if (mode == HudMode::REAL_ONLY || mode == HudMode::COMPARISON) {
+        float real_rpm_pct = std::min(track[car.current_seg].real_rpm / 12500.0f, 1.0f);
+        sf::RectangleShape real_rpm_fill(sf::Vector2f(400.f * real_rpm_pct, 20.f));
+        real_rpm_fill.setPosition(hud_x, hud_y);
+        
+        if (mode == HudMode::COMPARISON) {
+            real_rpm_fill.setFillColor(sf::Color::Transparent);
+            real_rpm_fill.setOutlineThickness(-2.f);
+            real_rpm_fill.setOutlineColor(sf::Color::White);
+        } else {
+            real_rpm_fill.setFillColor(sf::Color(0, 200, 255));
+        }
+        window.draw(real_rpm_fill);
+    }
 
     char gear_buf[64];
-    snprintf(gear_buf, sizeof(gear_buf), "GEAR: %d   %3.0f KM/H", car.current_gear, sim_speed_kmh);
+    if (mode == HudMode::AI_ONLY) {
+        snprintf(gear_buf, sizeof(gear_buf), "GEAR: %d   %3.0f KM/H", car.current_gear, sim_speed_kmh);
+    } else if (mode == HudMode::REAL_ONLY) {
+        snprintf(gear_buf, sizeof(gear_buf), "GEAR: %d   %3.0f KM/H", track[car.current_seg].real_gear, track[car.current_seg].real_speed_kmh);
+    } else {
+        snprintf(gear_buf, sizeof(gear_buf), "GEAR: %d/%d   %3.0f/%3.0f KM/H", car.current_gear, track[car.current_seg].real_gear, sim_speed_kmh, track[car.current_seg].real_speed_kmh);
+    }
     sf::Text text_gear(gear_buf, font, 24);
     text_gear.setPosition(hud_x + 100.f, hud_y - 35.f);
     text_gear.setFillColor(sf::Color::White);
-
-    // 4. Desenhar tudo
-    window.draw(txt_telemetry);
-    window.draw(txt_timings);
-    
-    window.draw(brake_bg);
-    window.draw(throttle_bg);
-    window.draw(brake_fill);
-    window.draw(throttle_fill);
-    
-    window.draw(rpm_bg);
-    window.draw(rpm_fill);
     window.draw(text_gear);
 }
 
@@ -210,6 +265,7 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
     std::vector<sf::CircleShape> telemetry_trail;
     int frame_counter = 0;
     bool isPaused = false;
+    HudMode current_mode = HudMode::AI_ONLY;
 
     while (window.isOpen()) {
         sf::Event event;
@@ -230,6 +286,12 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
                 }
                 else if (event.key.code == sf::Keyboard::Space) {
                     isPaused = !isPaused;
+                }
+                else if (event.key.code == sf::Keyboard::Right) {
+                    current_mode = static_cast<HudMode>((static_cast<int>(current_mode) + 1) % 3);
+                }
+                else if (event.key.code == sf::Keyboard::Left) {
+                    current_mode = static_cast<HudMode>((static_cast<int>(current_mode) + 2) % 3);
                 }
             }
         }
@@ -289,8 +351,6 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
 
         car_shape.setPosition(screen_car_x, screen_car_y);
 
-        float real_speed_kmh = track[car.current_seg].real_speed_kmh;
-
         window.clear(sf::Color(20, 20, 20));
 
         window.clear(sf::Color(20, 20, 20));
@@ -302,7 +362,7 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
         }
         window.draw(car_shape);
 
-        update_draw_hud(window, text_telemetry, text_timings, car, track, time_s1, time_s2, time_s3, last_lap_time, sim_speed_multiplier, font);
+        update_draw_hud(window, text_telemetry, text_timings, car, track, time_s1, time_s2, time_s3, last_lap_time, sim_speed_multiplier, font, current_mode);
         window.display();
     }
 }
