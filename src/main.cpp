@@ -9,7 +9,7 @@
 
 int main() {
 
-    const std::string TRACK_FILE = "../data/monza_pole.csv";
+    const std::string TRACK_FILE = "../data/belgium_pole.csv";
     std::cout << "[CPU] Loading circuit from: " << TRACK_FILE << std::endl;
 
     std::vector<TrackSegment> track = load_circuit_csv(TRACK_FILE);
