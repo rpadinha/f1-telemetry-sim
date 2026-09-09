@@ -16,6 +16,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(f1-telemetry-sim
     src/physics.cu
     src/circuit_loader.cpp
+    src/hud_renderer.cpp
     src/visualizer.cpp
     src/main.cpp 
 )

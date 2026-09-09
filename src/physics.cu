@@ -8,6 +8,23 @@
 // get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments)
 // update_transmission(F1Car* car)
 // apply_pedals_force(F1Car* car, const CarSetup* setup, const TrackSegment* track, float dt)
+
+__host__ __device__ bool is_straight(float radius_m, const CarSetup* setup) {
+    if (radius_m >= 10000.0f) { return true; } // its a perfect straight
+
+    // V^2 * (mass/R - 0.5 * rho * Cl * A * mu) = mass * g * mu
+    float cl_a = (setup->drag_coef * 3.0f) * Config::FRONTAL_AREA;
+    float aero_term = 0.5f * Config::AIR_DENSITY * cl_a * Config::BASE_MECH_GRIP;
+    float mechanical_term = setup->mass_kg / radius_m;
+
+    if (mechanical_term <= aero_term) { return true; } // if the aero part is faster than centrifugal force the car sticks
+
+    float max_v_sq = (setup->mass_kg * Config::GRAVITY * Config::BASE_MECH_GRIP) / (mechanical_term - aero_term);
+
+    // 97.5m/s -> 351km/h
+    return max_v_sq > (92.5f * 92.5f);
+}
+
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
     float max_grip = (setup->mass_kg * Config::GRAVITY + downforce) * Config::BASE_MECH_GRIP;
@@ -21,7 +38,7 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
     for (int i = 1; i <= Config::LOOKAHEAD_METERS; ++i) {
         int lookahead = (car->current_seg + i) % num_segments;
         
-        if (track[lookahead].radius_m < 10000.0f) {
+        if (!is_straight(track[lookahead].radius_m, setup)) {
             // including downforce logic at the corner will give us a more perfect approach the corner
             float corner_v_sq = base_corner_accel * track[lookahead].radius_m;
             float v_critical = sqrtf(corner_v_sq + (2.0f * Config::DECEL_RATE * dist_to_curve));
@@ -50,17 +67,17 @@ __host__ __device__ void update_transmission(F1Car* car) {
 }
 
 // mguk deployment
-__host__ __device__ float calculate_mguk_deployment(F1Car* car, const TrackSegment* track, int num_segments) {
-    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || track[car->current_seg].radius_m < 10000.f) {
+// this still has some trouble because maybe we are only checking the radius of curves
+// more advanced would probably also take into account car speed?
+__host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
+    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || !is_straight(track[car->current_seg].radius_m, setup)) {
         return 0.0f;
     }
 
     float upcoming_straight_m = track[car->current_seg].length_m - car->current_m;
     int lookahead = (car->current_seg + 1) % num_segments;
     
-    // one of the issues here right now is if a straight has some less than a 10000 value because some straights are not fully straight 
-    // it will stop in the middle of the straight 
-    while (track[lookahead].radius_m >= 10000.0f && upcoming_straight_m < 2500.0f) {
+    while (is_straight(track[lookahead].radius_m, setup) && upcoming_straight_m < 2500.0f) {
         upcoming_straight_m += track[lookahead].length_m;
         lookahead = (lookahead + 1) % num_segments;
     }
@@ -134,7 +151,7 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
             if (rpm_factor < 0.2f) rpm_factor = 0.2f;
             float current_power_kw = setup->ice_power_kw * rpm_factor;
 
-            float mguk_ratio = calculate_mguk_deployment(car, track, num_segments);
+            float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
 
             if (mguk_ratio > 0.0f) {
                 float power_to_add = setup->mguk_power_kw * mguk_ratio;
