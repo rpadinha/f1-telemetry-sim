@@ -11,7 +11,7 @@ if not os.path.exists("cache"):
 fastf1.Cache.enable_cache("cache")
 
 # Loading the session data (Ex: Monza 2025 Qualifying)
-session = fastf1.get_session(2022, "Belgium", "Q")
+session = fastf1.get_session(2025, "Monza", "Q")
 session.load(telemetry=True, weather=False, messages=False)
 
 lap = session.laps.pick_fastest()
@@ -52,7 +52,6 @@ df = pd.DataFrame({
 })
 
 df["Throttle"] = df["Throttle"] / 100
-df["Brake"] = df["Brake"] / 100
 
 # Track Rotation
 circuit_info = session.get_circuit_info()
@@ -93,7 +92,7 @@ df["Segment_Length"] = df["Distance"].diff().fillna(df["Distance"].iloc[0])
 if not os.path.exists("../data"):
   os.makedirs("../data")
 
-output_path = "../data/belgium_pole.csv"
-df[["Segment_Length", "Radius", "X", "Y", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
+output_path = "../data/monza_pole.csv"
+df[["Segment_Length", "Radius", "X", "Y", "Z", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
 
 print(f"Success! Exported {len(df)} segments to {output_path}")

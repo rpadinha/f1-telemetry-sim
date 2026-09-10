@@ -127,7 +127,7 @@ void reset_car_state(F1Car& car, const std::vector<TrackSegment>& track) {
     car.current_seg = 0;
     car.current_m = 0.0f;
     car.time_s = 0.0f;
-    car.qualifying_mode = false;
+    car.qualifying_mode = true;
     car.throttle_pedal = track[0].real_throttle_pedal;
     car.brake_pedal = track[0].real_brake_pedal;
     car.action = DriverAction::ACCELERATE;

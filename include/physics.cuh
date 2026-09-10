@@ -48,9 +48,10 @@ struct TrackSegment {
     float radius_m;                     // Radius of the segment (< 10000 means curvature)
     float x;                            // x of segment
     float y;                            // y of segment
+    float z;                            // z of segment
     float real_speed_kmh;               // Real speed of the segment (track data)
     float real_rpm;                     // Real RPM of the segment (track data)
-    int real_gear;                    // Real gear of the segment (track data)
+    int real_gear;                      // Real gear of the segment (track data)
     float real_throttle_pedal;          // Real value of throttle pedal
     float real_brake_pedal;             // Real value of brake pedal
 };

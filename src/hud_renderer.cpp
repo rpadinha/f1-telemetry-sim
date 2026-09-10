@@ -19,7 +19,6 @@ HudManager::HudManager(float window_width, float window_height)
     txt_gear.setFillColor(sf::Color::White);
     txt_gear.setPosition(hud_x + 100.f, hud_y - 35.f);
 
-    // Backgrounds dos Pedais
     brake_bg.setSize(sf::Vector2f(pedal_w, -pedal_h));
     brake_bg.setPosition(base_x, base_y);
     brake_bg.setFillColor(sf::Color(50, 50, 50, 200));
@@ -28,7 +27,6 @@ HudManager::HudManager(float window_width, float window_height)
     throttle_bg.setPosition(base_x + 40.f, base_y);
     throttle_bg.setFillColor(sf::Color(50, 50, 50, 200));
 
-    // Background RPM
     rpm_bg.setSize(sf::Vector2f(400.f, 20.f));
     rpm_bg.setPosition(hud_x, hud_y);
     rpm_bg.setFillColor(sf::Color(50, 50, 50, 200));

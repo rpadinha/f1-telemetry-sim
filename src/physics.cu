@@ -22,26 +22,51 @@ __host__ __device__ bool is_straight(float radius_m, const CarSetup* setup) {
     float max_v_sq = (setup->mass_kg * Config::GRAVITY * Config::BASE_MECH_GRIP) / (mechanical_term - aero_term);
 
     // 97.5m/s -> 351km/h
-    return max_v_sq > (92.5f * 92.5f);
+    return max_v_sq > (97.5f * 97.5f);
+}
+
+__host__ __device__ float get_track_pitch_angle(const TrackSegment* track, int current_seg, int num_segments) {
+    int next_seg = (current_seg + 1) % num_segments;
+    float delta_z = track[next_seg].z - track[current_seg].z;
+    float seg_length = track[current_seg].length_m; // this is always 1.0f;
+
+    if (seg_length<=0.0f) return 0.0f;
+
+    float ratio = delta_z / seg_length;
+    if (ratio>1.0f) ratio = 1.0f;
+    if (ratio<-1.0f)ratio = -1.0f;
+
+    // asinf is a CUDA functon to calculate arcsen of a float number
+    return asinf(ratio);
 }
 
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
+    float current_pitch = get_track_pitch_angle(track, car->current_seg, num_segments);
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
-    float max_grip = (setup->mass_kg * Config::GRAVITY + downforce) * Config::BASE_MECH_GRIP;
+
+    float current_normal = (setup->mass_kg * Config::GRAVITY * cosf(current_pitch)) + downforce;
+    if (current_normal < 0.0f) current_normal = 0.0f;
+
+    float max_grip = current_normal * Config::BASE_MECH_GRIP;
 
     float speed = sqrtf((max_grip * track[car->current_seg].radius_m) / setup->mass_kg);
 
     float dist_to_curve = track[car->current_seg].length_m - car->current_m;
 
-    float base_corner_accel = Config::GRAVITY * Config::BASE_MECH_GRIP;
-    
     for (int i = 1; i <= Config::LOOKAHEAD_METERS; ++i) {
         int lookahead = (car->current_seg + i) % num_segments;
         
         if (!is_straight(track[lookahead].radius_m, setup)) {
             // including downforce logic at the corner will give us a more perfect approach the corner
-            float corner_v_sq = base_corner_accel * track[lookahead].radius_m;
-            float v_critical = sqrtf(corner_v_sq + (2.0f * Config::DECEL_RATE * dist_to_curve));
+            float future_pitch = get_track_pitch_angle(track, lookahead, num_segments);
+            float future_normal = (setup->mass_kg * Config::GRAVITY * cosf(future_pitch)) + downforce;
+            if (future_normal < 0.0f) future_normal = 0.0f;
+
+            float future_grip = future_normal * Config::BASE_MECH_GRIP;
+            float corner_v_sq = (future_grip * track[lookahead].radius_m) / setup->mass_kg;
+            float effective_decel = Config::DECEL_RATE + (Config::GRAVITY * sinf(current_pitch));
+            if (effective_decel < 1.0f) effective_decel = 1.0f;
+            float v_critical = sqrtf(corner_v_sq + (2.0f * effective_decel * dist_to_curve));
             
             if (v_critical < speed) {
                 speed = v_critical;
@@ -100,10 +125,20 @@ __host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* 
     return ratio;
 }
 
+// applying pedals and forces
+// maybe we could divide this even further
 __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
+    float pitch_angle = get_track_pitch_angle(track, car->current_seg, num_segments);
+
     float drag_force = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * setup->drag_coef * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
-    float max_grip = (setup->mass_kg * Config::GRAVITY + downforce) * Config::BASE_MECH_GRIP;
+
+    float normal_force = (setup->mass_kg * Config::GRAVITY * cosf(pitch_angle)) + downforce;
+    if (normal_force < 0.0f) normal_force = 0.0f;
+
+    float max_grip = normal_force * Config::BASE_MECH_GRIP;
+
+    float gravity_longitudinal = -setup->mass_kg * Config::GRAVITY * sinf(pitch_angle);
 
     // Kamm Circle: Lateral Force: F * v² / R
     float lateral_force = (setup->mass_kg * car->v * car->v) / track[car->current_seg].radius_m;
@@ -127,7 +162,7 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
 
             car->brake_pedal = actual_braking_force / desired_braking_force;
 
-            net_force = -(setup->mass_kg * Config::DECEL_RATE) - drag_force; 
+            net_force = -(setup->mass_kg * Config::DECEL_RATE) - drag_force + gravity_longitudinal; 
             if (car->battery_mj < Config::MAX_BATTERY_MJ) {
                 car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
             }
@@ -137,7 +172,7 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
             car->throttle_pedal = 0.0f;
             car->brake_pedal = 0.0f;
             float engine_braking = (car->rpm / Config::RPM_REDLINE) * 1500.0f;
-            net_force = -drag_force - engine_braking;
+            net_force = -drag_force - engine_braking + gravity_longitudinal;
             if (car->battery_mj < Config::MAX_BATTERY_MJ) {
                 car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
             }
@@ -185,7 +220,7 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
 
             car->throttle_pedal = (ideal_pedal > throttle_allowed) ? throttle_allowed : ideal_pedal;
 
-            net_force = (car->throttle_pedal * actual_engine_force) - drag_force;
+            net_force = (car->throttle_pedal * actual_engine_force) - drag_force + gravity_longitudinal;
             break;
         }
     }
@@ -235,7 +270,7 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.current_gear = track[0].real_gear;
         car.current_seg = 0;
         car.time_s = 0.0f;
-        car.qualifying_mode = false;
+        car.qualifying_mode = true;
         car.throttle_pedal = track[0].real_throttle_pedal;
         car.brake_pedal = track[0].real_brake_pedal;
         
