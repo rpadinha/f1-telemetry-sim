@@ -107,7 +107,8 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
 
             car->throttle_pedal = (ideal_pedal > throttle_allowed) ? throttle_allowed : ideal_pedal;
 
-            net_force = (car->throttle_pedal * actual_engine_force) - drag_force + gravity_longitudinal;
+            // Net force should scale directly off the maximum permissible traction
+            net_force = (car->throttle_pedal * desired_engine_force) - drag_force + gravity_longitudinal;
             break;
         }
     }

@@ -23,7 +23,8 @@ __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, co
 
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
     float current_pitch = get_track_pitch_angle(track, car->current_seg, num_segments);
-    float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
+    float cl_a = (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
+    float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
 
     float current_normal = (setup->mass_kg * Config::GRAVITY * cosf(current_pitch)) + downforce;
     if (current_normal < 0.0f) current_normal = 0.0f;
@@ -38,16 +39,26 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
         int lookahead = (car->current_seg + i) % num_segments;
         
         if (!is_straight(track[lookahead].radius_m, setup)) {
-            // including downforce logic at the corner will give us a more perfect approach the corner
+            // calling back to this, this is a huge bug we had in the code as we were using the same downforce calculated for the current speed (line26 rn)
+            // FIX: Isolated v² algebraically on both sides of the friction limit equation:
+            // F_centrifugal = F_grip_mechanical + F_grip_downforce -> Solving for v² gives the formula below.
+            // This calculates the true, physics-safe speed limit of the corner purely from geometry.
             float future_pitch = get_track_pitch_angle(track, lookahead, num_segments);
-            float future_normal = (setup->mass_kg * Config::GRAVITY * cosf(future_pitch)) + downforce;
-            if (future_normal < 0.0f) future_normal = 0.0f;
+            float centrifugal_term = setup->mass_kg / track[lookahead].radius_m;
+            float aero_grip_term = 0.5f * Config::AIR_DENSITY * cl_a * Config::BASE_MECH_GRIP;
 
-            float future_grip = future_normal * Config::BASE_MECH_GRIP;
-            float corner_v_sq = (future_grip * track[lookahead].radius_m) / setup->mass_kg;
+            float corner_v_sq = 0.0f;
+
+            if (centrifugal_term > aero_grip_term) {
+                float gravity_grip = setup->mass_kg * Config::GRAVITY * cosf(future_pitch) * Config::BASE_MECH_GRIP;
+                corner_v_sq = gravity_grip / (centrifugal_term - aero_grip_term);
+            } else {
+                // Aero grip completely overpowers cornering forces (flat out corner)
+                // Set to a high upper safety limit or current top speed capabilities
+                corner_v_sq = 100.0f * 100.0f; 
+            }
 
             float corner_v = sqrtf(corner_v_sq);
-
             // Getting average G force in all braking zone
             float avg_speed_during_braking = (speed + corner_v) * 0.5f;
             float effective_decel = get_max_deceleration(avg_speed_during_braking, current_pitch, setup);
