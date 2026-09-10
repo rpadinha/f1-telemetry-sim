@@ -40,6 +40,25 @@ __host__ __device__ float get_track_pitch_angle(const TrackSegment* track, int c
     return asinf(ratio);
 }
 
+__host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup) {
+    // first we calculate the aerodynamics at current speed v_ms
+    float drag = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * setup->drag_coef * Config::FRONTAL_AREA;
+    float downforce = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
+
+    // mechanical grip with curr tyres
+    float normal_force = (setup->mass_kg * Config::GRAVITY * cosf(pitch_angle)) + downforce;
+    if (normal_force < 0.0f) { normal_force = 0.0f; }
+    float max_mech_brake = normal_force * Config::BASE_MECH_GRIP;
+
+    // travagem total = brakes(tyres) + drag force
+    float total_brake_force = max_mech_brake + drag;
+
+    float base_decel = total_brake_force / setup->mass_kg;
+
+    // gravity impacts if its going up / should also affect when its going down
+    return base_decel + (Config::GRAVITY * sinf(pitch_angle));
+}
+
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
     float current_pitch = get_track_pitch_angle(track, car->current_seg, num_segments);
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
@@ -64,8 +83,16 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
 
             float future_grip = future_normal * Config::BASE_MECH_GRIP;
             float corner_v_sq = (future_grip * track[lookahead].radius_m) / setup->mass_kg;
-            float effective_decel = Config::DECEL_RATE + (Config::GRAVITY * sinf(current_pitch));
-            if (effective_decel < 1.0f) effective_decel = 1.0f;
+
+            float corner_v = sqrtf(corner_v_sq);
+
+            // Getting average G force in all braking zone
+            float avg_speed_during_braking = (speed + corner_v) * 0.5f;
+            float effective_decel = get_max_deceleration(avg_speed_during_braking, current_pitch, setup);
+            // 20% cutoff for humanlike transition
+            effective_decel *= 0.80f;
+            if (effective_decel < 1.0f) { effective_decel = 1.0f; }
+
             float v_critical = sqrtf(corner_v_sq + (2.0f * effective_decel * dist_to_curve));
             
             if (v_critical < speed) {
@@ -154,15 +181,22 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
 
     switch (car->action) {
         case DriverAction::BRAKE: {
-            car->throttle_pedal = 0.0f;
-            float engine_braking = (car->rpm / Config::RPM_REDLINE) * 1500.0f;
+            float engine_braking_force = (car->rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
+
+            // max brake force the car can do ~5G
             float desired_braking_force = setup->mass_kg * Config::DECEL_RATE;
-            float actual_braking_force = (desired_braking_force > long_grip) ? long_grip : desired_braking_force;
-            actual_braking_force += engine_braking;
 
-            car->brake_pedal = actual_braking_force / desired_braking_force;
+            // what can we brake rn?
+            float actual_breaking_force = (desired_braking_force > long_grip) ? long_grip : desired_braking_force;
+            // adding engine breaking force to our actual breaking force
+            actual_breaking_force += engine_braking_force;
 
-            net_force = -(setup->mass_kg * Config::DECEL_RATE) - drag_force + gravity_longitudinal; 
+            // pedal force we take the desired -> bf we can do rn / bf max 
+            car->brake_pedal = actual_breaking_force / desired_braking_force;
+            if (car->brake_pedal > 1.0f) { car->brake_pedal = 1.0f; }
+
+            net_force = -actual_breaking_force - drag_force + gravity_longitudinal;
+
             if (car->battery_mj < Config::MAX_BATTERY_MJ) {
                 car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
             }
@@ -171,8 +205,8 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
         case DriverAction::COAST: {
             car->throttle_pedal = 0.0f;
             car->brake_pedal = 0.0f;
-            float engine_braking = (car->rpm / Config::RPM_REDLINE) * 1500.0f;
-            net_force = -drag_force - engine_braking + gravity_longitudinal;
+            float engine_braking_force = (car->rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
+            net_force = -drag_force - engine_braking_force + gravity_longitudinal;
             if (car->battery_mj < Config::MAX_BATTERY_MJ) {
                 car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
             }
@@ -231,6 +265,7 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
 __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
 
     float speed = get_allowed_speed(car, setup, track, num_segments);
+    // this is how we lift rn maybe we are bad at this?
     float lift_threshold_speed = speed - 10.0f;
     if (car->v > speed) {
         car->action = DriverAction::BRAKE;

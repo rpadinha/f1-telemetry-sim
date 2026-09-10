@@ -38,7 +38,8 @@ namespace Config {
     constexpr float RPM_UPSHIFT = 11800.0f;             // Ideal upshift RPM of the car
     constexpr float RPM_DOWNSHIFT = 7500.0f;            // Ideal downshift RPM of the car
     constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power
-    constexpr float RPM_IDLE = 5000.f;                  // RPM idle 
+    constexpr float RPM_IDLE = 5000.f;                  // RPM idle
+    constexpr float MAX_ENGINE_BRAKING = 1500.0f;       // idk about this chief
 
     // ERS System (MGU-K)
     constexpr float MAX_BATTERY_MJ = 4.0f;              // Maximum battery capacity in MegaJoules
