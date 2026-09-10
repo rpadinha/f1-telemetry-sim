@@ -14,7 +14,7 @@ namespace Config {
     constexpr float GRAVITY = 9.81f;                    // Gravitational acceleration in m/s^2
 
     // Car Limits
-    constexpr float DECEL_RATE = 49.0f;                 // Deceleration rate in m/s^2
+    constexpr float DECEL_RATE = 39.0f;                 // Deceleration rate in m/s^2
     constexpr float BASE_MECH_GRIP = 1.6f;              // Mechanical grip coefficient
     constexpr float ICE_MIN_FORCE = 15000.f;            // ICE minimum force in Newtons
     constexpr float WHEEL_RADIUS = 0.36f;               // Wheel radius in meters

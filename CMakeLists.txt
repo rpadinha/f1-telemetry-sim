@@ -14,11 +14,12 @@ find_package(SFML 2.6 COMPONENTS graphics window system REQUIRED)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(f1-telemetry-sim
-    src/physics.cu
+    src/main.cpp
+    src/visualizer.cpp
     src/circuit_loader.cpp
     src/hud_renderer.cpp
-    src/visualizer.cpp
-    src/main.cpp 
+    src/physics.cu
+    src/sim_driver.cu
 )
-
+set_target_properties(f1-telemetry-sim PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # this is needed for multiple cu files
 target_link_libraries(f1-telemetry-sim sfml-graphics sfml-window sfml-system)
