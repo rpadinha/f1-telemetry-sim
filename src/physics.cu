@@ -7,6 +7,7 @@
 // We will be dividing the step_physics funtion into separate functions for better readability and maintainability
 // applying pedals and forces
 // maybe we could divide this even further
+// this could go to sim_driver no?
 __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
     float pitch_angle = get_track_pitch_angle(track, car->current_seg, num_segments);
 
@@ -102,7 +103,11 @@ __host__ __device__ float apply_pedals_and_forces(F1Car* car, const CarSetup* se
             if (throttle_allowed < 0.0f) throttle_allowed = 0.0f;
 
 
-            float actual_engine_force = (desired_engine_force > long_grip) ? long_grip : desired_engine_force;
+            // rwd thing ~55% 
+            float rear_grip_ratio = 0.55f;
+            float max_traction_force = long_grip * rear_grip_ratio;
+
+            float actual_engine_force = (desired_engine_force > max_traction_force) ? max_traction_force : desired_engine_force;
             float ideal_pedal = actual_engine_force / desired_engine_force;
 
             car->throttle_pedal = (ideal_pedal > throttle_allowed) ? throttle_allowed : ideal_pedal;

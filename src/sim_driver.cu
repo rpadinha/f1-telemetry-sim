@@ -12,7 +12,7 @@ __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, co
     if (normal_force < 0.0f) { normal_force = 0.0f; }
     float max_mech_brake = normal_force * Config::BASE_MECH_GRIP;
 
-    // travagem total = brakes(tyres) + drag force
+    // total braking = brakes(tyres) + drag force
     float total_brake_force = max_mech_brake + drag;
 
     float base_decel = total_brake_force / setup->mass_kg;
@@ -78,8 +78,12 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
 }
 
 __host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
-    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || !is_straight(track[car->current_seg].radius_m, setup)) {
+    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || car->current_gear <= 3) {
         return 0.0f;
+    }
+
+    if (car->battery_mj < 0.5f) {
+        return 0.02f;
     }
 
     float upcoming_straight_m = track[car->current_seg].length_m - car->current_m;
@@ -98,6 +102,9 @@ __host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* 
     } else {
         ratio = 0.2f;
     }
+
+    float battery_ratio = car->battery_mj / Config::MAX_BATTERY_MJ;
+    ratio *= battery_ratio;
 
     if (car->v*3.6f > 320.0f) {
         ratio *= 0.7f;
