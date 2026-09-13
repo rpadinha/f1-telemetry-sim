@@ -1,5 +1,4 @@
 #include "sim_driver.cuh"
-#include "math_utils.cuh"
 #include <math.h>
 
 __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup) {
@@ -113,4 +112,87 @@ __host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* 
         ratio *= 0.2f;
     }
     return ratio;
+}
+
+__host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
+    switch (car->action) {
+        case DriverAction::BRAKE: {
+            car->throttle_pedal = 0.0f;
+            float engine_braking_force = (car->rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
+
+            // max brake force the car can do ~5G
+            dynamics.desired_braking_force = setup->mass_kg * Config::DECEL_RATE;
+
+            // what can we brake rn?
+            float actual_breaking_force = (dynamics.desired_braking_force > dynamics.long_grip) ? dynamics.long_grip : dynamics.desired_braking_force;
+            // adding engine breaking force to our actual breaking force
+            actual_breaking_force += engine_braking_force;
+
+            // pedal force we take the desired -> bf we can do rn / bf max 
+            car->brake_pedal = actual_breaking_force / dynamics.desired_braking_force;
+            if (car->brake_pedal > 1.0f) { car->brake_pedal = 1.0f; }
+
+            if (car->battery_mj < Config::MAX_BATTERY_MJ) {
+                car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
+            }
+            break;
+        }
+        case DriverAction::COAST: {
+            car->throttle_pedal = 0.0f;
+            car->brake_pedal = 0.0f;
+            if (car->battery_mj < Config::MAX_BATTERY_MJ) {
+                car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
+            }
+            break;
+        }
+        case DriverAction::ACCELERATE: {
+            car->brake_pedal = 0.0f;
+            // Calculate the current power output based on RPM
+            float rpm_diff = (car->rpm - Config::PEAK_POWER_RPM) / 4000.0f;
+            float rpm_factor = 1.0f - (rpm_diff * rpm_diff);
+            if (rpm_factor < 0.2f) rpm_factor = 0.2f;
+            float current_power_kw = setup->ice_power_kw * rpm_factor;
+
+            float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
+
+            if (mguk_ratio > 0.0f) {
+                float power_to_add = setup->mguk_power_kw * mguk_ratio;
+                current_power_kw += power_to_add;
+                car->battery_mj -= (power_to_add * dt) / 1000.0f;
+            }
+            
+
+            // ? 
+            float safe_rpm = car->rpm;
+            if (safe_rpm < 4000.0f) safe_rpm = 4000.0f;
+            // TORQUE mechanics Prevents the division-by-zero or division-by-one stability issues at low speeds
+            float engine_omega = (safe_rpm * 2.0f * 3.14159265f) / 60.f;
+            float engine_torque = (current_power_kw * 1000.f) / engine_omega;
+
+            // Translate engine torque down to the contact patch of the tyre
+            float wheel_torque = engine_torque * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE;
+            dynamics.desired_engine_force = wheel_torque / Config::WHEEL_RADIUS;
+
+            // if radius is to big in this case > 5000.f the lateral ratio stays at 0
+            float lateral_ratio = 0.0f;
+            if (track[car->current_seg].radius_m < 5000.0f) {
+                lateral_ratio = dynamics.lateral_force / dynamics.max_grip;
+            }
+
+            float throttle_allowed = 1.0f - lateral_ratio;
+            if (throttle_allowed > 1.0f) throttle_allowed = 1.0f;
+            if (throttle_allowed < 0.0f) throttle_allowed = 0.0f;
+
+
+            // rwd thing ~55% 
+            float rear_grip_ratio = 0.55f;
+            float max_traction_force = dynamics.long_grip * rear_grip_ratio;
+
+            float actual_engine_force = (dynamics.desired_engine_force > max_traction_force) ? max_traction_force : dynamics.desired_engine_force;
+            float ideal_pedal = actual_engine_force / dynamics.desired_engine_force;
+
+            car->throttle_pedal = (ideal_pedal > throttle_allowed) ? throttle_allowed : ideal_pedal;
+            break;
+        }
+    }
 }

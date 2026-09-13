@@ -7,6 +7,12 @@
 #define CUDA_CALLABLE
 #endif
 
+enum class DriverAction {
+    ACCELERATE,
+    BRAKE,
+    COAST
+};
+
 // the data that goes into the gpu
 struct CarSetup {
     int id;                             // setup id
@@ -14,12 +20,6 @@ struct CarSetup {
     float ice_power_kw;                 // Internal Combustion Engine Power
     float mguk_power_kw;                // Eletric Engine Power
     float drag_coef;                    // Aerodynamic Coefficient
-};
-
-enum class DriverAction {
-    ACCELERATE,
-    BRAKE,
-    COAST
 };
 
 // Keeps the state of the car every dt
@@ -40,6 +40,19 @@ struct F1Car {
     // Transmission
     int current_gear;                   // Current gear of the car
     float rpm;                          // Current RPM of the car
+};
+
+// keeps the dynamics of the car each dt
+struct F1CarDynamics {
+    float max_grip;                     // 
+    float long_grip;                    // 
+    float drag_force;                   // 
+    float lateral_force;                // 
+    float gravity_longitudinal;         // 
+    float max_traction_force;           // 
+    float engine_breaking_force;        //
+    float desired_braking_force;        //
+    float desired_engine_force;         //
 };
 
 // track segment

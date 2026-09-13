@@ -15,7 +15,7 @@ int main() {
     std::vector<TrackSegment> track = load_circuit_csv(TRACK_FILE);
 
     if (track.empty()) return -1;
-
+    
     std::cout << "[CPU] Track loaded! Total segments: " << track.size() << std::endl;
     
     std::cout << "[CPU] Generating " << Config::NUM_SETUPS << " different setups..." << std::endl;
