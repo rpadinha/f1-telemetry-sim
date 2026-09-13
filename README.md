@@ -6,7 +6,9 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 
 **Note:** A CUDA-enabled NVIDIA GPU is currently strictly required to run this simulation engine.
 
-![Simulation Demo]
+![Simulation Demo](https://github.com/user-attachments/assets/8e620258-ab30-4dbd-971d-0b837a5ba5d7)
+
+
 
 ## Key Engineering Features
 
@@ -35,16 +37,14 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 
 1. Clone the repository:
    ```bash
-      git clone [https://github.com/your-username/f1-telemetry-sim.git](https://github.com/your-username/f1-telemetry-sim.git)
-      ```
+   git clone [https://github.com/rpadinha/f1-telemetry-sim.git](https://github.com/rpadinha/f1-telemetry-sim.git)
 
 2. Build the project using CMake:
- ```bash
-    mkdir build && cd build
-    cmake ..
-    make
-    ```
+   ```bash
+   mkdir build && cd build
+   cmake ..
+   make
+   
 3. Run the simulation:
-  ```bash
-     ./f1-telemetry-sim
-     ```
+   ```bash
+   ./f1-telemetry-sim
