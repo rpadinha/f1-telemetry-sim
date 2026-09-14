@@ -69,19 +69,20 @@ void HudManager::update(const F1Car& car, const std::vector<TrackSegment>& track
     snprintf(buf_tel, sizeof(buf_tel),
         "%s\n\n"
         "MGU-K: %.2f MJ\n"
+        "Fuel: %.2f kg\n"
         "Sim Speed: %.1fx\n\n"
         "--- TRACK ---\n"
         "Seg: %d / %lu\n"
         "DRS: %s\n"
         "Radius: %s\n",
-        mode_title.c_str(), car.battery_mj, sim_speed,
+        mode_title.c_str(), car.battery_mj, car.fuel_kg, sim_speed,
         car.current_seg, track.size(),
         (track[car.current_seg].drs_zone ? "true" : "false"),
         (track[car.current_seg].radius_m >= 10000.f) ? "STRAIGHT" : std::to_string((int)track[car.current_seg].radius_m).c_str());
     txt_telemetry.setString(buf_tel);
 
     char buf_timing[256];
-    snprintf(buf_timing, sizeof(buf_timing), "S1: %.3f\nS2: %.3f\nS3: %.3f\nLap Time: %.3f\nLast Lap: %.3f", s1, s2, s3, car.time_s, last_lap_time);
+    snprintf(buf_timing, sizeof(buf_timing), "S1: %.3f\nS2: %.3f\nS3: %.3f\nLap Time: %.3f\nLast Lap: %.3f\nLaps:%d", s1, s2, s3, car.time_s, last_lap_time, car.laps_completed);
     txt_timings.setString(buf_timing);
 
     char gear_buf[64];
@@ -119,11 +120,11 @@ void HudManager::update(const F1Car& car, const std::vector<TrackSegment>& track
     }
 
     // Atualizar RPM
-    float rpm_pct = std::min(car.rpm / 12500.0f, 1.0f);
+    float rpm_pct = std::min(car.rpm / Config::RPM_REDLINE, 1.0f);
     rpm_fill.setSize(sf::Vector2f(400.f * rpm_pct, 20.f));
-    rpm_fill.setFillColor(car.rpm > 11800.0f ? sf::Color::Red : sf::Color::Green);
+    rpm_fill.setFillColor(car.rpm > Config::RPM_UPSHIFT ? sf::Color::Red : sf::Color::Green);
 
-    float real_rpm_pct = std::min(track[car.current_seg].real_rpm / 12500.0f, 1.0f);
+    float real_rpm_pct = std::min(track[car.current_seg].real_rpm / Config::RPM_REDLINE, 1.0f);
     real_rpm_fill.setSize(sf::Vector2f(400.f * real_rpm_pct, 20.f));
     if (mode == HudMode::COMPARISON) {
         real_rpm_fill.setFillColor(sf::Color::Transparent);

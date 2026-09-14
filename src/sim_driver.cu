@@ -34,7 +34,7 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
 
     float dist_to_curve = track[car->current_seg].length_m - car->current_m;
 
-    for (int i = 1; i <= Config::LOOKAHEAD_METERS; ++i) {
+    for (int i = 1; dist_to_curve < Config::LOOKAHEAD_METERS; ++i) {
         int lookahead = (car->current_seg + i) % num_segments;
         
         if (!is_straight(track[lookahead].radius_m, setup)) {

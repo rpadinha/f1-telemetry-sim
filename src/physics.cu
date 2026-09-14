@@ -18,22 +18,34 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
         car->action = DriverAction::ACCELERATE;
     }
 
-
+    car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
     F1CarDynamics dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
     update_driver_pedals(car, dynamics, setup, track, num_segments, dt);
 
     float net_force = compute_net_force(car, setup, dynamics);
+    
+    float fuel_flow_rate = (100.0f / 3600.0f);          // FIA 100kg/h
+    if (car->fuel_kg > 0.0f) {
+        car->fuel_kg -= (car->throttle_pedal * fuel_flow_rate) * dt;
+        if (car->fuel_kg < 0.0f) car->fuel_kg = 0.0f;
+    }
 
-    float a = net_force / setup->mass_kg;
+    float total_mass = setup->mass_kg + car->fuel_kg;
+
+    float a = net_force / total_mass;
     car->v += a * dt;
     if (car->v < 0.0f) car->v = 0.0f; // Prevent reverse tracking bugs
     car->current_m += car->v * dt;
     car->time_s += dt;
 
-    while (car->current_seg < num_segments && car->current_m >= track[car->current_seg].length_m) {
+    while (car->current_m >= track[car->current_seg].length_m) {
         car->current_m -= track[car->current_seg].length_m;
         car->current_seg++;
+        if (car->current_seg >= num_segments) {
+            car->current_seg = 0;
+            car->laps_completed++;
+        }
     }
     update_transmission(car);
 }
@@ -49,11 +61,13 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         // Starter states for each setup
         car.v = track[0].real_speed_kmh / 3.6f;
         car.battery_mj = 4.0f;
+        car.fuel_kg = 10.0f;
         car.rpm = track[0].real_rpm;
         car.current_gear = track[0].real_gear;
         car.current_seg = 0;
         car.time_s = 0.0f;
         car.qualifying_mode = true;
+        car.laps_completed = 0;
         car.throttle_pedal = track[0].real_throttle_pedal;
         car.brake_pedal = track[0].real_brake_pedal;
         
@@ -61,7 +75,7 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         float dt = 0.002f;
         float max_speed = 0.0f;
         
-        while (car.current_seg < num_segments && car.time_s < 300.f) {
+        while (car.laps_completed < 1 && car.time_s < 300.f) {
             step_physics(&car, &setup, track, num_segments, dt);
             
             if (car.v > max_speed) max_speed = car.v;

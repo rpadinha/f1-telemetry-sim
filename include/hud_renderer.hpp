@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include "physics.cuh"
+#include "config.cuh"
 #include "circuit_loader.h"
 
 enum class HudMode {

@@ -34,7 +34,7 @@ namespace Config {
         if (gear > 8) gear = 8;
         return ratios[gear - 1];
     }
-    constexpr float RPM_REDLINE = 125000.0f;            // Redline RPM of the car
+    constexpr float RPM_REDLINE = 12500.0f;             // Redline RPM of the car // wowzers
     constexpr float RPM_UPSHIFT = 11800.0f;             // Ideal upshift RPM of the car
     constexpr float RPM_DOWNSHIFT = 7500.0f;            // Ideal downshift RPM of the car
     constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power

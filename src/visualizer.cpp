@@ -18,6 +18,7 @@ struct TrackRenderData {
 
 struct SimState {
     float sim_speed_multiplier = 1.0f;
+    int current_lap = 0;
     float time_s1 = 0.0f, time_s2 = 0.0f, time_s3 = 0.0f, last_lap_time = 0.0f;
     int frame_counter = 0;
     bool isPaused = false;
@@ -122,12 +123,14 @@ sf::Vector2f get_screen_coordinates(int current_seg, float current_m, const std:
 void reset_car_state(F1Car& car, const std::vector<TrackSegment>& track) {
     car.v = track[0].real_speed_kmh / 3.6f;
     car.battery_mj = Config::MAX_BATTERY_MJ;
+    car.fuel_kg = 10.0f;
     car.current_gear = track[0].real_gear;
     car.rpm = track[0].real_rpm;
     car.current_seg = 0;
     car.current_m = 0.0f;
     car.time_s = 0.0f;
     car.qualifying_mode = true;
+    car.laps_completed = 0;
     car.throttle_pedal = track[0].real_throttle_pedal;
     car.brake_pedal = track[0].real_brake_pedal;
     car.action = DriverAction::ACCELERATE;
@@ -178,10 +181,11 @@ void update_simulation_step(F1Car& car, const CarSetup& setup, const std::vector
                     state.time_s2 = car.time_s - state.time_s1;
             }
 
-            if (car.current_seg >= track.size() - 1) {
+            if (car.laps_completed > state.current_lap) {
                 state.time_s3 = car.time_s - (state.time_s1 + state.time_s2);
                 state.last_lap_time = car.time_s;
-                reset_car_state(car, track);
+                car.time_s = 0.0f;
+                state.current_lap = car.laps_completed;
                 state.telemetry_trail.clear();
                 }
             }

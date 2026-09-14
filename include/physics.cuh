@@ -27,7 +27,6 @@ struct F1Car {
     float v;                            // Velocity of the car
     int current_seg;                    // Position of the car (segment of the circuit)
     float current_m;                    // Current meter of the circuit
-    float battery_mj;                   // Ammount of battery
     float time_s;                       // Time on track (resets after going through finish line)
 
     DriverAction action;                 // Current driver action
@@ -41,7 +40,12 @@ struct F1Car {
     int current_gear;                   // Current gear of the car
     float rpm;                          // Current RPM of the car
 
+    float battery_mj;                   // Ammount of battery
+    float fuel_kg;                      // Ammount of fuel
+
     bool drs_open;                      // drs boolean 
+
+    int laps_completed;                 // amount of laps completed by the sim for controlling better
 };
 
 // keeps the dynamics of the car each dt
