@@ -40,6 +40,8 @@ struct F1Car {
     // Transmission
     int current_gear;                   // Current gear of the car
     float rpm;                          // Current RPM of the car
+
+    bool drs_open;                      // drs boolean 
 };
 
 // keeps the dynamics of the car each dt
@@ -62,6 +64,7 @@ struct TrackSegment {
     float x;                            // x of segment
     float y;                            // y of segment
     float z;                            // z of segment
+    bool drs_zone;                      // is the track segment a drs zone?
     float real_speed_kmh;               // Real speed of the segment (track data)
     float real_rpm;                     // Real RPM of the segment (track data)
     int real_gear;                      // Real gear of the segment (track data)

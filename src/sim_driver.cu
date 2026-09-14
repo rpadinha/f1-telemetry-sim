@@ -115,9 +115,12 @@ __host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* 
 }
 
 __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
+    car->throttle_pedal = 0.0f;
+    car->brake_pedal = 0.0f;
+    car->drs_open = false;
+
     switch (car->action) {
         case DriverAction::BRAKE: {
-            car->throttle_pedal = 0.0f;
             float engine_braking_force = (car->rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
 
             // max brake force the car can do ~5G
@@ -138,21 +141,20 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
             break;
         }
         case DriverAction::COAST: {
-            car->throttle_pedal = 0.0f;
-            car->brake_pedal = 0.0f;
             if (car->battery_mj < Config::MAX_BATTERY_MJ) {
                 car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
             }
             break;
         }
         case DriverAction::ACCELERATE: {
-            car->brake_pedal = 0.0f;
             // Calculate the current power output based on RPM
             float rpm_diff = (car->rpm - Config::PEAK_POWER_RPM) / 4000.0f;
             float rpm_factor = 1.0f - (rpm_diff * rpm_diff);
             if (rpm_factor < 0.2f) rpm_factor = 0.2f;
             float current_power_kw = setup->ice_power_kw * rpm_factor;
-
+            if (track[car->current_seg].drs_zone && car->brake_pedal == 0.0f) {
+                car->drs_open = true;
+            }
             float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
 
             if (mguk_ratio > 0.0f) {
@@ -161,8 +163,6 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
                 car->battery_mj -= (power_to_add * dt) / 1000.0f;
             }
             
-
-            // ? 
             float safe_rpm = car->rpm;
             if (safe_rpm < 4000.0f) safe_rpm = 4000.0f;
             // TORQUE mechanics Prevents the division-by-zero or division-by-one stability issues at low speeds

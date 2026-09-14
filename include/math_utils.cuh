@@ -41,8 +41,11 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
 
     float pitch_angle = get_track_pitch_angle(track, car->current_seg, num_segments);
 
-    dynamics.drag_force = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * setup->drag_coef * Config::FRONTAL_AREA;
-
+    float current_drag_coef = setup->drag_coef;
+    if (car->drs_open) {
+        current_drag_coef *= 0.65f;
+    }
+    dynamics.drag_force = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * current_drag_coef * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
 
     float normal_force = (setup->mass_kg * Config::GRAVITY * cosf(pitch_angle)) + downforce;

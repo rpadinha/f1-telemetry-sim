@@ -22,25 +22,27 @@ print(
 
 # Interpolating telemetry data to have a uniform distance step (1 meter) for better curvature calculation
 # and x, y. z speed. rpm and gear.
-distancia_original = tel["Distance"].to_numpy()
-total_distance = distancia_original[-1]
+original_distance = tel["Distance"].to_numpy()
+total_distance = original_distance[-1]
 # Fixed segments of 1 meter
-distancia_uniforme = np.arange(0, total_distance, 1.0)
+uniform_distance = np.arange(0, total_distance, 1.0)
 
 # Interpolate
 # Using 'pchip' (Piecewise Cubic Hermite Interpolating Polynomial)
-x_interp = pchip_interpolate(distancia_original, tel["X"].to_numpy(), distancia_uniforme)
-y_interp = pchip_interpolate(distancia_original, tel["Y"].to_numpy(), distancia_uniforme)
-z_interp = pchip_interpolate(distancia_original, tel["Z"].to_numpy(), distancia_uniforme)
-speed_interp = pchip_interpolate(distancia_original, tel["Speed"].to_numpy(), distancia_uniforme)
-rpm_interp = pchip_interpolate(distancia_original, tel["RPM"].to_numpy(), distancia_uniforme)
+x_interp = pchip_interpolate(original_distance, tel["X"].to_numpy(), uniform_distance)
+y_interp = pchip_interpolate(original_distance, tel["Y"].to_numpy(), uniform_distance)
+z_interp = pchip_interpolate(original_distance, tel["Z"].to_numpy(), uniform_distance)
+speed_interp = pchip_interpolate(original_distance, tel["Speed"].to_numpy(), uniform_distance)
+rpm_interp = pchip_interpolate(original_distance, tel["RPM"].to_numpy(), uniform_distance)
 # nGear goes from 1 to 8, so we can round the interpolated values to the nearest integer
-gear_interp = np.round(pchip_interpolate(distancia_original, tel["nGear"].to_numpy(), distancia_uniforme)).astype(int)
-throttle_pedal_interp = np.round(pchip_interpolate(distancia_original, tel["Throttle"].to_numpy(), distancia_uniforme))
-brake_pedal_interp = np.round(pchip_interpolate(distancia_original, tel["Brake"].to_numpy(), distancia_uniforme))
+gear_interp = np.round(pchip_interpolate(original_distance, tel["nGear"].to_numpy(), uniform_distance)).astype(int)
+throttle_pedal_interp = np.round(pchip_interpolate(original_distance, tel["Throttle"].to_numpy(), uniform_distance))
+brake_pedal_interp = np.round(pchip_interpolate(original_distance, tel["Brake"].to_numpy(), uniform_distance))
+is_drs_zone = np.round(pchip_interpolate(original_distance, tel["DRS"].to_numpy(), uniform_distance))
+is_drs_zone = np.where(is_drs_zone >= 10, 1, 0) # transforming into 1 or 0 true or false
 
 df = pd.DataFrame({
-    "Distance": distancia_uniforme,
+    "Distance": uniform_distance,
     "X": x_interp,
     "Y": y_interp,
     "Z": z_interp,
@@ -48,7 +50,8 @@ df = pd.DataFrame({
     "RPM": rpm_interp,
     "nGear": gear_interp,
     "Throttle": throttle_pedal_interp,
-    "Brake": brake_pedal_interp
+    "Brake": brake_pedal_interp,
+    "DRS": is_drs_zone
 })
 
 df["Throttle"] = df["Throttle"] / 100
@@ -93,6 +96,6 @@ if not os.path.exists("../data"):
   os.makedirs("../data")
 
 output_path = "../data/monza_pole.csv"
-df[["Segment_Length", "Radius", "X", "Y", "Z", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
+df[["Segment_Length", "Radius", "X", "Y", "Z", "DRS", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
 
 print(f"Success! Exported {len(df)} segments to {output_path}")

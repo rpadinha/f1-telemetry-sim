@@ -72,9 +72,11 @@ void HudManager::update(const F1Car& car, const std::vector<TrackSegment>& track
         "Sim Speed: %.1fx\n\n"
         "--- TRACK ---\n"
         "Seg: %d / %lu\n"
+        "DRS: %s\n"
         "Radius: %s\n",
         mode_title.c_str(), car.battery_mj, sim_speed,
         car.current_seg, track.size(),
+        (track[car.current_seg].drs_zone ? "true" : "false"),
         (track[car.current_seg].radius_m >= 10000.f) ? "STRAIGHT" : std::to_string((int)track[car.current_seg].radius_m).c_str());
     txt_telemetry.setString(buf_tel);
 
@@ -136,6 +138,7 @@ void HudManager::update(const F1Car& car, const std::vector<TrackSegment>& track
 void HudManager::draw(sf::RenderWindow& window, HudMode mode) {
     window.draw(txt_telemetry);
     window.draw(txt_timings);
+    
     window.draw(brake_bg);
     window.draw(throttle_bg);
     window.draw(rpm_bg);

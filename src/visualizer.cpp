@@ -262,7 +262,7 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
         window.clear(sf::Color(20, 20, 20));
 
         window.draw(t_data.track_lines);
-
+        
         for (const auto& dot : state.telemetry_trail) { window.draw(dot); }
 
         if (state.current_mode == HudMode::SIM_ONLY || state.current_mode == HudMode::COMPARISON) {
@@ -270,6 +270,11 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
             
             sf::Color current_color = (car.action == DriverAction::ACCELERATE) ? sf::Color::Green :
                                     (car.action == DriverAction::BRAKE) ? sf::Color::Red : sf::Color::Yellow;
+
+            if (car.drs_open) {
+                current_color = sf::Color::Magenta;
+            }
+            
             car_shape.setFillColor(current_color);
 
             state.frame_counter++;
