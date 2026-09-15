@@ -17,11 +17,12 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 
 * **Aerodynamic Downforce:**
   $$F_{\text{downforce}} = \frac{1}{2} \rho \cdot v^2 \cdot C_L \cdot A$$
-  Approximated using the overall efficiency coefficient:
+
+* **Approximated using the overall efficiency coefficient:**
   $$C_L \cdot A = 3.0 \cdot C_d \cdot A$$
 
 * **Track Pitch Angle (Elevation Change):**
-  $$\theta = \arcsin\left(\frac{\Delta z}{\Delta s}\right) = \arcsin\left(\frac{z_{i+1} - z_i}{\text{length}_{m}}\right)$$
+  $$\theta = \arcsin\left(\frac{\Delta z}{\Delta s}\right) = \arcsin\left(\frac{z_{i+1} - z_i}{\text{length}\ \text{m}}\right)$$
 
 * **Total Normal Force:**
   $$F_N = (m \cdot g \cdot \cos\theta) + F_{\text{downforce}}$$
