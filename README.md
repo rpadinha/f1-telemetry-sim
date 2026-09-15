@@ -6,7 +6,8 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 
 **Note:** A CUDA-enabled NVIDIA GPU is currently strictly required to run this simulation engine.
 
-![Simulation Demo](https://github.com/user-attachments/assets/8e620258-ab30-4dbd-971d-0b837a5ba5d7)
+# Demo Simulation
+<img width="1280" height="720" alt="Kooha-2026-09-15-19-59-34" src="https://github.com/user-attachments/assets/8e9bb48c-b047-46be-bf78-c386b4e02b25" />
 
 
 ### Mathematical Modeling & Physics Formulation
