@@ -21,7 +21,7 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
   $$C_L \cdot A = 3.0 \cdot C_d \cdot A$$
 
 * **Track Pitch Angle (Elevation Change):**
-  $$\theta = \arcsin\left(\frac{\Delta z}{\Delta s}\right) = \arcsin\left(\frac{z_{i+1} - z_i}{\text{length\_m}}\right)$$
+  $$\theta = \arcsin\left(\frac{\Delta z}{\Delta s}\right) = \arcsin\left(\frac{z_{i+1} - z_i}{\Delta s}\right)$$
 
 * **Total Normal Force:**
   $$F_N = (m \cdot g \cdot \cos\theta) + F_{\text{downforce}}$$
