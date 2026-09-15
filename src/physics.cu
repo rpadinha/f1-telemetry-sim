@@ -30,7 +30,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
         car->fuel_kg -= (car->throttle_pedal * fuel_flow_rate) * dt;
         if (car->fuel_kg < 0.0f) car->fuel_kg = 0.0f;
     }
-
+    
     float total_mass = setup->mass_kg + car->fuel_kg;
 
     float a = net_force / total_mass;

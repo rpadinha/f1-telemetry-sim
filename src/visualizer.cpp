@@ -273,11 +273,8 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
             sf::Vector2f car_pos = get_screen_coordinates(car.current_seg, car.current_m, track, t_data);
             
             sf::Color current_color = (car.action == DriverAction::ACCELERATE) ? sf::Color::Green :
-                                    (car.action == DriverAction::BRAKE) ? sf::Color::Red : sf::Color::Yellow;
-
-            if (car.drs_open) {
-                current_color = sf::Color::Magenta;
-            }
+                                    (car.action == DriverAction::BRAKE) ? sf::Color::Red : (car.drs_open) ? sf::Color::Magenta :
+                                    sf::Color::Yellow;
             
             car_shape.setFillColor(current_color);
 
