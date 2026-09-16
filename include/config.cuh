@@ -18,7 +18,9 @@ namespace Config {
     constexpr float BASE_MECH_GRIP = 1.6f;              // Mechanical grip coefficient
     constexpr float ICE_MIN_FORCE = 15000.f;            // ICE minimum force in Newtons
     constexpr float WHEEL_RADIUS = 0.36f;               // Wheel radius in meters
+    constexpr float WHEEL_BASE = 3.6f;                  // Wheelbase of the car in m
     constexpr float FINAL_DRIVE = 5.0f;                 // Rear Differential
+    constexpr float GRAVITY_CENTER_HEIGHT = 0.30f;      // Gravity center height of the f1 car in m
 
     // Gear Ratios and RPM Limits
     // so here we got error: identifier "Config::GEAR_RATIOS" is undefined in device code

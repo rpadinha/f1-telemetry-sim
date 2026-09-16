@@ -184,11 +184,9 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
             if (throttle_allowed < 0.0f) throttle_allowed = 0.0f;
 
 
-            // rwd thing ~55% 
-            float rear_grip_ratio = 0.55f;
-            float max_traction_force = dynamics.long_grip * rear_grip_ratio;
-
-            float actual_engine_force = (dynamics.desired_engine_force > max_traction_force) ? max_traction_force : dynamics.desired_engine_force;
+            float actual_engine_force = (dynamics.desired_engine_force > dynamics.max_traction_force) 
+                                        ? dynamics.max_traction_force 
+                                        : dynamics.desired_engine_force;
             float ideal_pedal = actual_engine_force / dynamics.desired_engine_force;
 
             car->throttle_pedal = (ideal_pedal > throttle_allowed) ? throttle_allowed : ideal_pedal;

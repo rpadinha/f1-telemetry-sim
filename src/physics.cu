@@ -34,7 +34,8 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     float total_mass = setup->mass_kg + car->fuel_kg;
 
     float a = net_force / total_mass;
-    car->v += a * dt;
+    car->a = a;                         // accel
+    car->v += a * dt;                   // vel
     if (car->v < 0.0f) car->v = 0.0f; // Prevent reverse tracking bugs
     car->current_m += car->v * dt;
     car->time_s += dt;
@@ -60,6 +61,7 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
 
         // Starter states for each setup
         car.v = track[0].real_speed_kmh / 3.6f;
+        car.a = 0.0f;
         car.battery_mj = 4.0f;
         car.fuel_kg = 10.0f;
         car.rpm = track[0].real_rpm;

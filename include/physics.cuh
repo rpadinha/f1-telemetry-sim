@@ -24,7 +24,9 @@ struct CarSetup {
 
 // Keeps the state of the car every dt
 struct F1Car {
+    float a;                            // Linear acceleration
     float v;                            // Velocity of the car
+    
     int current_seg;                    // Position of the car (segment of the circuit)
     float current_m;                    // Current meter of the circuit
     float time_s;                       // Time on track (resets after going through finish line)
@@ -34,8 +36,6 @@ struct F1Car {
     float throttle_pedal;                // Throttle pedal position (0.0 to 1.0)
     float brake_pedal;                   // Brake pedal position (0.0 to 1.0)
 
-    bool qualifying_mode;               // this is just cool to add for now but it states if its in qualifying mode or not, if it is then the car will not regenerate energy and will use more power to simulate a qualifying lap
-
     // Transmission
     int current_gear;                   // Current gear of the car
     float rpm;                          // Current RPM of the car
@@ -43,7 +43,9 @@ struct F1Car {
     float battery_mj;                   // Ammount of battery
     float fuel_kg;                      // Ammount of fuel
 
-    bool drs_open;                      // drs boolean 
+    bool drs_open;                      // drs boolean
+
+    bool qualifying_mode;               // this is just cool to add for now but it states if its in qualifying mode or not, if it is then the car will not regenerate energy and will use more power to simulate a qualifying lap
 
     int laps_completed;                 // amount of laps completed by the sim for controlling better
 };

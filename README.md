@@ -23,9 +23,9 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 | | Lateral Cornering Load | $F_{\mathrm{lat}} = \frac{m \cdot v^2}{R}$ |
 | | Kamm Circle Long. Limit | $F_{\mathrm{long,grip}} = \sqrt{F_{\mathrm{grip,max}}^2 - F_{\mathrm{lat}}^2}$ |
 | | RWD Traction Limit | $F_{\mathrm{traction,max}} = 0.55 \cdot F_{\mathrm{long,grip}}$ |
-| **Powertrain** | Wheel Speed & RPM | $\mathrm{RPM} = \left(\frac{v}{r_{\mathrm{wheel}}}\right) \cdot \mathrm{Ratio}_{\mathrm{gear}} \cdot \mathrm{FinalDrive} \cdot \left(\frac{60}{2\pi}\right)$ |
-| | Wheel Driving Force | $F_{\mathrm{engine}} = \frac{\tau_{\mathrm{engine}} \cdot \mathrm{Ratio}_{\mathrm{gear}} \cdot \mathrm{FinalDrive}}{r_{\mathrm{wheel}}}$ |
-| | Passive Engine Braking | $F_{\mathrm{engine\_brake}} = \left(\frac{\mathrm{RPM}}{\mathrm{RPM}_{\mathrm{redline}}}\right) \cdot F_{\mathrm{brake,max}}$ |
+| **Powertrain** | Wheel Speed & RPM | $\mathrm{RPM} = \left(\frac{v}{r_{\mathrm{wheel}}}\right) \cdot \mathrm{Ratio}\_{\mathrm{gear}} \cdot \mathrm{FinalDrive} \cdot \left(\frac{60}{2\pi}\right)$ |
+| | Wheel Driving Force | $F_{\mathrm{engine}} = \frac{\tau_{\mathrm{engine}} \cdot \mathrm{Ratio}\_{\mathrm{gear}} \cdot \mathrm{FinalDrive}}{r\_{\mathrm{wheel}}}$ |
+| | Passive Engine Braking | $F_{\mathrm{engine\_brake}} = \left(\frac{\mathrm{RPM}}{\mathrm{RPM}\_{\mathrm{redline}}}\right) \cdot F\_{\mathrm{brake,max}}$ |
 | **Predictive AI** | Corner Speed Limit | $v_{\mathrm{corner}}^2 = \frac{m \cdot g \cdot \cos\theta \cdot \mu_{\mathrm{base}}}{\left(\frac{m}{R}\right) - \left(\frac{1}{2}\rho \cdot C_L A \cdot \mu_{\mathrm{base}}\right)}$ |
 | | Torricelli Decel Boundary | $v_{\mathrm{critical}} = \sqrt{v_{\mathrm{corner}}^2 + 2 \cdot a_{\mathrm{decel}} \cdot d}$ |
 | **Numerical Step** | Euler Integration | $a = \frac{F_{\mathrm{net}}}{m}, \quad v_{t+\Delta t} = v_t + a\Delta t, \quad s_{t+\Delta t} = s_t + v\Delta t$ |
