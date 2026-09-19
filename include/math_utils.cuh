@@ -4,6 +4,7 @@
 #include <math.h>
 #include "config.cuh"
 #include "physics.cuh"
+#include "tyres.cuh"
 
 __host__ __device__ inline bool is_straight(float radius_m, const CarSetup* setup) {
     /*
@@ -81,8 +82,8 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     if (rear_grip_ratio > 0.85f) rear_grip_ratio = 0.85f;
     if (rear_grip_ratio < 0.15f) rear_grip_ratio = 0.15f;
 
-    // Maximum friction circle radius: F_grip,max = F_normal * mu_base
-    dynamics.max_grip = normal_force * Config::BASE_MECH_GRIP;
+    // Maximum friction circle radius: F_grip,max = F_normal * the grip of the car according to tyres grip
+    dynamics.max_grip = normal_force * calculate_effective_grip(car);
 
     // Centrifugal cornering load: F_lat = (m * v^2) / R
     dynamics.lateral_force = (setup->mass_kg * car->v * car->v) / track[car->current_seg].radius_m;

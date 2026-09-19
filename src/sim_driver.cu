@@ -76,44 +76,6 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
     return speed;
 }
 
-__host__ __device__ float calculate_mguk_deployment(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
-    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || car->current_gear <= 3) {
-        return 0.0f;
-    }
-
-    if (car->battery_mj < 0.5f) {
-        return 0.02f;
-    }
-
-    float upcoming_straight_m = track[car->current_seg].length_m - car->current_m;
-    int lookahead = (car->current_seg + 1) % num_segments;
-    
-    while (is_straight(track[lookahead].radius_m, setup) && upcoming_straight_m < 2500.0f) {
-        upcoming_straight_m += track[lookahead].length_m;
-        lookahead = (lookahead + 1) % num_segments;
-    }
-
-    float ratio = 0.0f;
-    if (upcoming_straight_m > 800.f) {
-        ratio = 1.0f;
-    } else if (upcoming_straight_m > 400.f) {
-        ratio = 0.5f;
-    } else {
-        ratio = 0.2f;
-    }
-
-    float battery_ratio = car->battery_mj / Config::MAX_BATTERY_MJ;
-    ratio *= battery_ratio;
-
-    if (car->v*3.6f > 320.0f) {
-        ratio *= 0.7f;
-    }
-    if (car->v*3.6f > 340.0f) {
-        ratio *= 0.2f;
-    }
-    return ratio;
-}
-
 __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
     car->throttle_pedal = 0.0f;
     car->brake_pedal = 0.0f;
@@ -147,31 +109,18 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
             break;
         }
         case DriverAction::ACCELERATE: {
-            // Calculate the current power output based on RPM
-            float rpm_diff = (car->rpm - Config::PEAK_POWER_RPM) / 4000.0f;
-            float rpm_factor = 1.0f - (rpm_diff * rpm_diff);
-            if (rpm_factor < 0.2f) rpm_factor = 0.2f;
-            float current_power_kw = setup->ice_power_kw * rpm_factor;
+            
             if (track[car->current_seg].drs_zone && car->brake_pedal == 0.0f) {
                 car->drs_open = true;
             }
-            float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
 
+            float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
+            float mguk_power = (mguk_ratio > 0.0f) ? (setup->mguk_power_kw * mguk_ratio) : 0.0f;
             if (mguk_ratio > 0.0f) {
-                float power_to_add = setup->mguk_power_kw * mguk_ratio;
-                current_power_kw += power_to_add;
-                car->battery_mj -= (power_to_add * dt) / 1000.0f;
+                car->battery_mj -= (mguk_power * dt) / 1000.0f;
             }
             
-            float safe_rpm = car->rpm;
-            if (safe_rpm < 4000.0f) safe_rpm = 4000.0f;
-            // TORQUE mechanics Prevents the division-by-zero or division-by-one stability issues at low speeds
-            float engine_omega = (safe_rpm * 2.0f * 3.14159265f) / 60.f;
-            float engine_torque = (current_power_kw * 1000.f) / engine_omega;
-
-            // Translate engine torque down to the contact patch of the tyre
-            float wheel_torque = engine_torque * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE;
-            dynamics.desired_engine_force = wheel_torque / Config::WHEEL_RADIUS;
+            dynamics.desired_engine_force = compute_drive_force(car, setup, 1.0f, mguk_power);
 
             // if radius is to big in this case > 5000.f the lateral ratio stays at 0
             float lateral_ratio = 0.0f;

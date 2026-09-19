@@ -1,6 +1,8 @@
 #include "physics.cuh"
 #include "config.cuh"
+#include "engine.cuh"
 #include "powertrain.cuh"           // gives acess to powertrain functions
+#include "tyres.cuh"                // gives acess to tyres functions
 #include "math_utils.cuh"           // Gives acess to math functions needed
 #include "sim_driver.cuh"           // gives acess to sim driver
 
@@ -25,11 +27,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
 
     float net_force = compute_net_force(car, setup, dynamics);
     
-    float fuel_flow_rate = (100.0f / 3600.0f);          // FIA 100kg/h
-    if (car->fuel_kg > 0.0f) {
-        car->fuel_kg -= (car->throttle_pedal * fuel_flow_rate) * dt;
-        if (car->fuel_kg < 0.0f) car->fuel_kg = 0.0f;
-    }
+    burn_fuel(car, car->throttle_pedal, dt);
     
     float total_mass = setup->mass_kg + car->fuel_kg;
 
@@ -49,6 +47,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
         }
     }
     update_transmission(car);
+    update_tyres(car, &dynamics, setup, dt);
 }
 
 // Cuda Kernel
@@ -66,6 +65,10 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.fuel_kg = 10.0f;
         car.rpm = track[0].real_rpm;
         car.current_gear = track[0].real_gear;
+        car.current_compound = TyreCompound::C3;
+        car.tyre_temp_front_c = 85.0f;
+        car.tyre_temp_rear_c = 85.0f;
+        car.tyre_wear_pct = 0.0f;
         car.current_seg = 0;
         car.time_s = 0.0f;
         car.qualifying_mode = true;

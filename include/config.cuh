@@ -1,6 +1,8 @@
 #ifndef CONFIG_CUH
 #define CONFIG_CUH
 
+#include <physics.cuh>
+
 #ifdef __CUDACC__
 #define CUDA_CALLABLE __host__ __device__
 #else
@@ -21,7 +23,7 @@ namespace Config {
     constexpr float WHEEL_BASE = 3.6f;                  // Wheelbase of the car in m
     constexpr float FINAL_DRIVE = 5.0f;                 // Rear Differential
     constexpr float GRAVITY_CENTER_HEIGHT = 0.30f;      // Gravity center height of the f1 car in m
-
+    constexpr float FUEL_FLOW_KG_S = 100.0f / 3600.0f;  // max fuel flow in
     // Gear Ratios and RPM Limits
     // so here we got error: identifier "Config::GEAR_RATIOS" is undefined in device code
     /*constexpr float GEAR_RATIOS[8] = {3.2f, 2.6f, 2.1f, //
@@ -41,7 +43,31 @@ namespace Config {
     constexpr float RPM_DOWNSHIFT = 7500.0f;            // Ideal downshift RPM of the car
     constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power
     constexpr float RPM_IDLE = 5000.f;                  // RPM idle
-    constexpr float MAX_ENGINE_BRAKING = 1500.0f;       // idk about this chief
+    constexpr float MAX_ENGINE_BRAKING = 1500.0f;       // Engine braking max force
+
+    // Tyres Things
+    /* Here we will have to do the same we did above as we need to return values according
+    to the TyreCompound current_compound */
+    CUDA_CALLABLE inline TyreProperties get_tyre_properties(TyreCompound compound) {
+        switch (compound) {
+            case TyreCompound::C1: // hardest, low grip, low wear
+                return { 1.42f, 115.0f, 15.0f, 0.00008f, 0.000008f };
+            case TyreCompound::C2: // 
+                return { 1.50f, 110.0f, 12.0f, 0.00010f, 0.000012f };
+            case TyreCompound::C3: // 
+                return { 1.60f, 105.0f, 10.0f, 0.00014f, 0.000018f };
+            case TyreCompound::C4: // 
+                return { 1.72f, 100.0f, 8.0f,  0.00020f, 0.000028f };
+            case TyreCompound::C5: // softest, high grip, high wear
+                return { 1.82f, 95.0f,  6.0f,  0.00030f, 0.000045f }; 
+            default:
+                return { 1.60f, 105.0f, 10.0f, 0.0014f, 0.000018f };
+        }
+    }
+
+    // track and ambient
+    constexpr float AMBIENT_TEMP_C = 25.0f;
+    constexpr float TRACK_TEMP_C = 42.0f;
 
     // ERS System (MGU-K)
     constexpr float MAX_BATTERY_MJ = 4.0f;              // Maximum battery capacity in MegaJoules

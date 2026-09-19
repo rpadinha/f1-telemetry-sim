@@ -7,10 +7,27 @@
 #define CUDA_CALLABLE
 #endif
 
+enum class TyreCompound {
+    C1 = 0,
+    C2 = 1,
+    C3 = 2,
+    C4 = 3,
+    C5 = 4
+};
+
 enum class DriverAction {
     ACCELERATE,
     BRAKE,
     COAST
+};
+
+// struct for tyre properties
+struct TyreProperties {
+    float base_grip;                    // mu coeff (1.40 to 1.75)
+    float opt_temp_c;                   // optimal working temperature
+    float temp_window_c;                // window amplitude
+    float thermal_deg_rate;             // overheating sensibility
+    float wear_rate;                    // for each meter the ammount of wear
 };
 
 // the data that goes into the gpu
@@ -39,6 +56,11 @@ struct F1Car {
     // Transmission
     int current_gear;                   // Current gear of the car
     float rpm;                          // Current RPM of the car
+
+    TyreCompound current_compound;      // Current tyre of the car (C1-hardest - C5-softest)
+    float tyre_temp_front_c;            // average temp of front tyres
+    float tyre_temp_rear_c;             // average temp of rear tyres
+    float tyre_wear_pct;                // 0.0 (new) to 1.0 (worn out)
 
     float battery_mj;                   // Ammount of battery
     float fuel_kg;                      // Ammount of fuel
