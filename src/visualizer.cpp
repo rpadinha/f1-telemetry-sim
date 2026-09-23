@@ -125,6 +125,7 @@ void reset_car_state(F1Car& car, const std::vector<TrackSegment>& track) {
     car.battery_mj = Config::MAX_BATTERY_MJ;
     car.fuel_kg = 10.0f;
     car.current_gear = track[0].real_gear;
+    car.gear_shift_timer = 0.0f;
     car.rpm = track[0].real_rpm;
     car.current_compound = TyreCompound::C3;
     car.tyre_temp_front_c = 85.0f;
@@ -191,9 +192,9 @@ void update_simulation_step(F1Car& car, const CarSetup& setup, const std::vector
                 car.time_s = 0.0f;
                 state.current_lap = car.laps_completed;
                 state.telemetry_trail.clear();
-                }
             }
         }
+    }
 }
 
 void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup& setup) {
@@ -264,7 +265,6 @@ void run_sfml_visualizer(const std::vector<TrackSegment>& track, const CarSetup&
             dot.setPosition(car_pos);
             state.telemetry_trail.push_back(dot);
         }
-
         car_shape.setPosition(car_pos);
 
         window.clear(sf::Color(20, 20, 20));

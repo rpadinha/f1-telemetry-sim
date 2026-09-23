@@ -65,4 +65,11 @@ __host__ __device__ inline void update_tyres(F1Car* car,const F1CarDynamics* dyn
     }
 }
 
+// Load Degressivity (instead of grip gorwing perfectly linear with vertical load)
+__host__ __device__ inline float apply_load_sensitivity(float base_mu, float normal_force, float nominal_load) {
+    constexpr float LOAD_SENSITIVITY = 0.000028f;
+    float delta_load = normal_force - nominal_load;
+    return base_mu / (1.0f + LOAD_SENSITIVITY * delta_load);
+}
+
 #endif

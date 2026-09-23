@@ -59,6 +59,7 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     // F_downforce = 0.5 * rho * v^2 * Cl * A (where Cl * A ~= 3.0 * Cd * A)
     float cl_a = (setup->drag_coef * 3.0f) * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
+    float nominal_load = (setup->mass_kg + car->fuel_kg) * Config::GRAVITY;
 
     // Base static gravity load perpendicular to the road: F_normal,static = m * g * cos(theta)
     float static_normal = setup->mass_kg * Config::GRAVITY * cosf(pitch_angle);
@@ -83,7 +84,9 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     if (rear_grip_ratio < 0.15f) rear_grip_ratio = 0.15f;
 
     // Maximum friction circle radius: F_grip,max = F_normal * the grip of the car according to tyres grip
-    dynamics.max_grip = normal_force * calculate_effective_grip(car);
+    float effective_mu = calculate_effective_grip(car);
+    effective_mu = apply_load_sensitivity(effective_mu, normal_force, nominal_load);
+    dynamics.max_grip = normal_force * effective_mu;
 
     // Centrifugal cornering load: F_lat = (m * v^2) / R
     dynamics.lateral_force = (setup->mass_kg * car->v * car->v) / track[car->current_seg].radius_m;

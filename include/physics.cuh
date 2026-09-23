@@ -56,6 +56,7 @@ struct F1Car {
     // Transmission
     int current_gear;                   // Current gear of the car
     float rpm;                          // Current RPM of the car
+    float gear_shift_timer;             // ignition cut timer for upshifts (seconds)
 
     TyreCompound current_compound;      // Current tyre of the car (C1-hardest - C5-softest)
     float tyre_temp_front_c;            // average temp of front tyres

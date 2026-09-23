@@ -1,6 +1,6 @@
 #include "physics.cuh"
 #include "config.cuh"
-#include "engine.cuh"
+#include "engine.cuh"               // gives acess to engine functions
 #include "powertrain.cuh"           // gives acess to powertrain functions
 #include "tyres.cuh"                // gives acess to tyres functions
 #include "math_utils.cuh"           // Gives acess to math functions needed
@@ -21,6 +21,8 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     }
 
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
+
+    // creating a new car dynamics everytime is weird
     F1CarDynamics dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
     update_driver_pedals(car, dynamics, setup, track, num_segments, dt);
@@ -46,6 +48,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
             car->laps_completed++;
         }
     }
+    upshift_cut(car,dt);
     update_transmission(car);
     update_tyres(car, &dynamics, setup, dt);
 }
@@ -62,9 +65,10 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.v = track[0].real_speed_kmh / 3.6f;
         car.a = 0.0f;
         car.battery_mj = 4.0f;
-        car.fuel_kg = 10.0f;
+        car.fuel_kg = 20.0f;
         car.rpm = track[0].real_rpm;
         car.current_gear = track[0].real_gear;
+        car.gear_shift_timer = 0.0f;
         car.current_compound = TyreCompound::C3;
         car.tyre_temp_front_c = 85.0f;
         car.tyre_temp_rear_c = 85.0f;

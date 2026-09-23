@@ -57,7 +57,7 @@ __host__ __device__ inline float calculate_mguk_deployment(F1Car* car, const Car
 // Toque & Contanct Patch Drive Force
 // P = tau * Omega -> Tau = P / Omega -> F_wheel = (tau * GearRatio * FinalDrive) / WheelRadius
 __host__ __device__ inline float compute_drive_force(const F1Car* car, const CarSetup* setup, float throttle_pedal, float extra_power_kw = 0.0f) {
-    if (throttle_pedal <= 0.0f) return 0.0f;
+    if (throttle_pedal <= 0.0f || car->gear_shift_timer > 0.0f) { return 0.0f; }
 
     float ice_power = (car->fuel_kg > 0.0f) ? get_engine_power_kw(car->rpm, setup->ice_power_kw) : 0.0f;
     float total_power_kw = ice_power + extra_power_kw;
