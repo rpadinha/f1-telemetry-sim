@@ -1,41 +1,44 @@
 #include <fstream>
 #include <iostream>
-#include "physics.cuh"
-#include "config.cuh"
+#include "physics.cuh"              // gives acess to structs and functions made in cuda
+#include "config.cuh"               // gives acess to global config variables
 #include "engine.cuh"               // gives acess to engine functions
 #include "powertrain.cuh"           // gives acess to powertrain functions
 #include "tyres.cuh"                // gives acess to tyres functions
 #include "math_utils.cuh"           // Gives acess to math functions needed
 #include "sim_driver.cuh"           // gives acess to sim driver
 
-// crazy crazy
 __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
 
     float speed = get_allowed_speed(car, setup, track, num_segments);
-    // this is how we lift rn maybe we are bad at this?
-    float lift_threshold_speed = speed - 10.0f;
-    if (car->v > speed) {
+
+    // Se estiver acima da velocidade permitida com folga, trava.
+    // Caso contrário, pé na tábua!
+    if (car->v > speed + 0.2f) {
         car->action = DriverAction::BRAKE;
-    } else if (car->v > lift_threshold_speed && !car->qualifying_mode) {
-        car->action = DriverAction::COAST;
-    } else if (car->v < lift_threshold_speed){ 
+    } else {
         car->action = DriverAction::ACCELERATE;
     }
 
+    // Se quiseres ter COAST apenas em modo de corrida (e NUNCA na qualificação):
+    /*
+    if (!car->qualifying_mode && car->v > speed - 3.0f && car->v <= speed + 0.2f) {
+        car->action = DriverAction::COAST;
+    }
+    */
+    
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
     // creating a new car dynamics everytime is weird
     F1CarDynamics dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
     update_driver_pedals(car, dynamics, setup, track, num_segments, dt);
-
-    float net_force = compute_net_force(car, setup, dynamics);
-    
+    update_ers(car, setup, track, num_segments, dt);
     burn_fuel(car, car->throttle_pedal, dt);
-    
-    float total_mass = setup->mass_kg + car->fuel_kg;
 
-    float a = net_force / total_mass;
+    float net_force = compute_net_force(car, dynamics);
+
+    float a = net_force / dynamics.total_mass;
     car->a = a;                         // accel
     car->v += a * dt;                   // vel
     if (car->v < 0.0f) car->v = 0.0f; // Prevent reverse tracking bugs
@@ -50,9 +53,10 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
             car->laps_completed++;
         }
     }
+
     upshift_cut(car,dt);
     update_transmission(car);
-    update_tyres(car, &dynamics, setup, dt);
+    update_tyres(car, dynamics, setup, dt);
 }
 
 // Cuda Kernel
@@ -72,9 +76,14 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.current_gear = track[0].real_gear;
         car.gear_shift_timer = 0.0f;
         car.current_compound = TyreCompound::C3;
-        car.tyre_temp_front_c = 85.0f;
-        car.tyre_temp_rear_c = 85.0f;
-        car.tyre_wear_pct = 0.0f;
+        car.tyre_temp_fl = 85.0f;
+        car.tyre_temp_fr = 85.0f;
+        car.tyre_temp_rl = 85.0f;
+        car.tyre_temp_rr = 85.0f;
+        car.tyre_wear_fl = 0.0f;
+        car.tyre_wear_fr = 0.0f;
+        car.tyre_wear_rl = 0.0f;
+        car.tyre_wear_rr = 0.0f;
         car.current_seg = 0;
         car.time_s = 0.0f;
         car.qualifying_mode = false;
@@ -111,9 +120,14 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
     car.current_gear = track[0].real_gear;
     car.gear_shift_timer = 0.0f;
     car.current_compound = TyreCompound::C3;
-    car.tyre_temp_front_c = 85.0f;
-    car.tyre_temp_rear_c = 85.0f;
-    car.tyre_wear_pct = 0.0f;
+    car.tyre_temp_fl = 85.0f;
+    car.tyre_temp_fr = 85.0f;
+    car.tyre_temp_rl = 85.0f;
+    car.tyre_temp_rr = 85.0f;
+    car.tyre_wear_fl = 0.0f;
+    car.tyre_wear_fr = 0.0f;
+    car.tyre_wear_rl = 0.0f;
+    car.tyre_wear_rr = 0.0f;
     car.current_seg = 0;
     car.current_m = 0.0f;
     car.time_s = 0.0f;
@@ -133,8 +147,8 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
             out_telemetry[car.current_seg].throttle = car.throttle_pedal;
             out_telemetry[car.current_seg].brake = car.brake_pedal;
             out_telemetry[car.current_seg].time_s = car.time_s;
-            out_telemetry[car.current_seg].tyre_temp_front = car.tyre_temp_front_c;
-            out_telemetry[car.current_seg].tyre_temp_rear = car.tyre_temp_rear_c;
+            out_telemetry[car.current_seg].tyre_temp_front = (car.tyre_temp_fl + car.tyre_temp_fr) / 2.f;
+            out_telemetry[car.current_seg].tyre_temp_rear = (car.tyre_temp_rl + car.tyre_temp_rr) / 2.f;
             last_recorded_seg = car.current_seg;
         }
         step_physics(&car, &setup, track, num_segments, dt);

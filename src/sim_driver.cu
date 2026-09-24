@@ -1,6 +1,7 @@
 #include "sim_driver.cuh"
 #include <math.h>
 
+// getting max deceleration
 __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu) {
     // first we calculate the aerodynamics at current speed v_ms
     float drag = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * setup->drag_coef * Config::FRONTAL_AREA;
@@ -21,6 +22,7 @@ __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, co
     return total_brake_force / setup->mass_kg + (Config::GRAVITY * sinf(pitch_angle));
 }
 
+// getting allowed speed
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
     float current_pitch = get_track_pitch_angle(track, car->current_seg, num_segments);
     float base_mu = calculate_effective_grip(car);
@@ -75,73 +77,116 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
     return speed;
 }
 
+// for now deploying eletric energy based on battery soc, speed and upcoming straight length
+__host__ __device__ float calculate_mguk_deployment(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
+    if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || car->current_gear <= 3) {
+        return 0.0f;
+    }
+
+    if (car->battery_mj < 0.5f) {
+        return 0.02f;
+    }
+
+    float upcoming_straight_m = track[car->current_seg].length_m - car->current_m;
+    int lookahead = (car->current_seg + 1) % num_segments;
+    
+    while (is_straight(track[lookahead].radius_m, setup) && upcoming_straight_m < 2500.0f) {
+        upcoming_straight_m += track[lookahead].length_m;
+        lookahead = (lookahead + 1) % num_segments;
+    }
+
+    float ratio = 0.0f;
+    if (upcoming_straight_m > 800.f) {
+        ratio = 1.0f;
+    } else if (upcoming_straight_m > 400.f) {
+        ratio = 0.5f;
+    } else {
+        ratio = 0.2f;
+    }
+
+    float battery_ratio = car->battery_mj / Config::MAX_BATTERY_MJ;
+    ratio *= battery_ratio;
+
+    if (car->v*3.6f > 320.0f) {
+        ratio *= 0.7f;
+    }
+    if (car->v*3.6f > 340.0f) {
+        ratio *= 0.2f;
+    }
+    return ratio;
+}
+
+// ers fucntion independent from other code
+__host__ __device__ void update_ers(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
+    if (car->throttle_pedal > 0.0f) {
+        float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
+        float mguk_power = (mguk_ratio > 0.0f) ? (setup->mguk_power_kw * mguk_ratio) : 0.0f;
+        
+        car->battery_mj -= (mguk_power * dt) / 1000.0f;
+        if (car->battery_mj < 0.0f) car->battery_mj = 0.0f;
+    }
+
+    if (car->brake_pedal > 0.0f) {
+        car->battery_mj += (Config::MGUK_REGEN_KW * car->brake_pedal * dt) / 1000.0f;
+    } 
+    else if (car->throttle_pedal == 0.0f) {
+        car->battery_mj += (Config::MGUK_REGEN_KW * 0.25f * dt) / 1000.0f;
+    }
+
+    if (car->battery_mj > Config::MAX_BATTERY_MJ) {
+        car->battery_mj = Config::MAX_BATTERY_MJ;
+    }
+}
+
+// updating driver pedals
 __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
-    car->throttle_pedal = 0.0f;
-    car->brake_pedal = 0.0f;
-    car->drs_open = false;
+    float target_throttle = 0.0f;
+    float target_brake = 0.0f;
 
     switch (car->action) {
-        case DriverAction::BRAKE: {
-            float engine_braking_force = (car->rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
-
-            // max brake force the car can do ~5G
-            dynamics.desired_braking_force = setup->mass_kg * Config::DECEL_RATE;
-
-            // what can we brake rn?
-            float actual_breaking_force = (dynamics.desired_braking_force > dynamics.long_grip) ? dynamics.long_grip : dynamics.desired_braking_force;
-            // adding engine breaking force to our actual breaking force
-            actual_breaking_force += engine_braking_force;
-
-            // pedal force we take the desired -> bf we can do rn / bf max 
-            car->brake_pedal = actual_breaking_force / dynamics.desired_braking_force;
-            if (car->brake_pedal > 1.0f) { car->brake_pedal = 1.0f; }
-
-            if (car->battery_mj < Config::MAX_BATTERY_MJ) {
-                car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
-            }
+        case DriverAction::BRAKE:
+            dynamics.desired_braking_force = dynamics.total_mass * Config::DECEL_RATE;
+            target_brake = 1.0f;
             break;
-        }
-        case DriverAction::COAST: {
-            if (car->battery_mj < Config::MAX_BATTERY_MJ) {
-                car->battery_mj += (Config::MGUK_REGEN_KW * dt) / 1000.0f;
-            }
-            break;
-        }
-        case DriverAction::ACCELERATE: {
             
-            if (track[car->current_seg].drs_zone && car->brake_pedal == 0.0f) {
-                car->drs_open = true;
-            }
-
+        case DriverAction::COAST:
+            break;
+            
+        case DriverAction::ACCELERATE: {
             float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
             float mguk_power = (mguk_ratio > 0.0f) ? (setup->mguk_power_kw * mguk_ratio) : 0.0f;
-            if (mguk_ratio > 0.0f) {
-                car->battery_mj -= (mguk_power * dt) / 1000.0f;
-            }
             
-            dynamics.desired_engine_force = compute_drive_force(car, setup, 1.0f, mguk_power);
+            dynamics.desired_engine_force = compute_drive_force(car, setup, mguk_power);
 
-            // if radius is to big in this case > 5000.f the lateral ratio stays at 0
             float lateral_ratio = 0.0f;
-            if (track[car->current_seg].radius_m < 5000.0f) {
+            if (track[car->current_seg].radius_m < 5000.0f && dynamics.max_grip > 1e-3f) {
                 lateral_ratio = dynamics.lateral_force / dynamics.max_grip;
             }
 
-            float throttle_allowed = 1.0f - lateral_ratio;
-            if (throttle_allowed > 1.0f) throttle_allowed = 1.0f;
-            if (throttle_allowed < 0.0f) throttle_allowed = 0.0f;
-
-            if (dynamics.desired_engine_force > 1e-3) {
-                float actual_engine_force = (dynamics.desired_engine_force > dynamics.max_traction_force) 
-                                        ? dynamics.max_traction_force 
-                                        : dynamics.desired_engine_force;
-                float ideal_pedal = actual_engine_force / dynamics.desired_engine_force;
-
-                car->throttle_pedal = (ideal_pedal > throttle_allowed) ? throttle_allowed : ideal_pedal;
-            } else {
-                car->throttle_pedal = 0.0f;
-            }
+            target_throttle = 1.0f - lateral_ratio;
+            if (target_throttle > 1.0f) target_throttle = 1.0f;
+            if (target_throttle < 0.0f) target_throttle = 0.0f;
             break;
         }
+    }
+
+    float pedal_rate = (1.0f / 0.15f) * dt;
+
+    if (car->throttle_pedal < target_throttle) {
+        car->throttle_pedal += pedal_rate;
+        if (car->throttle_pedal > target_throttle) car->throttle_pedal = target_throttle;
+    } else {
+        car->throttle_pedal -= pedal_rate;
+        if (car->throttle_pedal < target_throttle) car->throttle_pedal = target_throttle;
+    }
+
+    if (target_brake > 0.0f) car->throttle_pedal = 0.0f;
+
+    if (car->brake_pedal < target_brake) {
+        car->brake_pedal += pedal_rate;
+        if (car->brake_pedal > target_brake) car->brake_pedal = target_brake;
+    } else {
+        car->brake_pedal -= pedal_rate;
+        if (car->brake_pedal < target_brake) car->brake_pedal = target_brake;
     }
 }

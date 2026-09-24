@@ -59,9 +59,15 @@ struct F1Car {
     float gear_shift_timer;             // ignition cut timer for upshifts (seconds)
 
     TyreCompound current_compound;      // Current tyre of the car (C1-hardest - C5-softest)
-    float tyre_temp_front_c;            // average temp of front tyres
-    float tyre_temp_rear_c;             // average temp of rear tyres
-    float tyre_wear_pct;                // 0.0 (new) to 1.0 (worn out)
+    float tyre_temp_fl;                 // Front-Left
+    float tyre_temp_fr;                 // Front-Right
+    float tyre_temp_rl;                 // Rear-Left
+    float tyre_temp_rr;                 // Rear-Right
+
+    float tyre_wear_fl;                 // Front-Left
+    float tyre_wear_fr;                 // Front-Right
+    float tyre_wear_rl;                 // Rear-Left
+    float tyre_wear_rr;                 // Rear-Right
 
     float battery_mj;                   // Ammount of battery
     float fuel_kg;                      // Ammount of fuel
@@ -73,17 +79,28 @@ struct F1Car {
     int laps_completed;                 // amount of laps completed by the sim for controlling better
 };
 
-// keeps the dynamics of the car each dt
+// keeps the dynamics of the car each dt (this has been made bigger to hold all math made in basic functions)
 struct F1CarDynamics {
-    float max_grip;                     // 
-    float long_grip;                    // 
-    float drag_force;                   // 
-    float lateral_force;                // 
-    float gravity_longitudinal;         // 
-    float max_traction_force;           // 
-    float engine_breaking_force;        //
-    float desired_braking_force;        //
-    float desired_engine_force;         //
+    float total_mass;                   // mass_kg + fuel
+    float pitch_angle;                  // track pitch
+
+    float drag_force;                   // drag force
+    float lateral_force;                // lateral force
+    float gravity_longitudinal;         // gravity_longitudinal
+    
+    float max_grip;                     // max grip
+    float long_grip;                    // longitudinal grip
+    float max_traction_force;           // max traction force
+    float engine_braking_force;         // engine braking
+
+    float desired_braking_force;        // desired braking
+    float desired_engine_force;         // desired power
+    float applied_long_force;           // real f_long that pedals gave!
+
+    float load_fl;                      // front left load
+    float load_fr;                      // front right load
+    float load_rl;                      // rear left load
+    float load_rr;                      // rear right load
 };
 
 // track segment

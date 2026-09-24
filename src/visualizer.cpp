@@ -128,9 +128,14 @@ void reset_car_state(F1Car& car, const std::vector<TrackSegment>& track) {
     car.gear_shift_timer = 0.0f;
     car.rpm = track[0].real_rpm;
     car.current_compound = TyreCompound::C3;
-    car.tyre_temp_front_c = 85.0f;
-    car.tyre_temp_rear_c = 85.0f;
-    car.tyre_wear_pct = 0.0f;
+    car.tyre_temp_fl = 85.0f;
+    car.tyre_temp_fr = 85.0f;
+    car.tyre_temp_rl = 85.0f;
+    car.tyre_temp_rr = 85.0f;
+    car.tyre_wear_fl = 0.0f;
+    car.tyre_wear_fr = 0.0f;
+    car.tyre_wear_rl = 0.0f;
+    car.tyre_wear_rr = 0.0f;
     car.current_seg = 0;
     car.current_m = 0.0f;
     car.time_s = 0.0f;
