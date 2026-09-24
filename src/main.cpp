@@ -58,5 +58,7 @@ int main() {
     std::cout << " ----- Lap Time: " << results[0].lap_time << std::endl;
     std::cout << " ----- Max Velocity: " << results[0].top_speed_kmh << std::endl;
 
+    export_simulated_telemetry(pole_position_setup, track.data(), track.size());
+
     run_sfml_visualizer(track, pole_position_setup);
 }

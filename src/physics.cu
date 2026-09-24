@@ -1,3 +1,5 @@
+#include <fstream>
+#include <iostream>
 #include "physics.cuh"
 #include "config.cuh"
 #include "engine.cuh"               // gives acess to engine functions
@@ -75,7 +77,7 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.tyre_wear_pct = 0.0f;
         car.current_seg = 0;
         car.time_s = 0.0f;
-        car.qualifying_mode = true;
+        car.qualifying_mode = false;
         car.laps_completed = 0;
         car.throttle_pedal = track[0].real_throttle_pedal;
         car.brake_pedal = track[0].real_brake_pedal;
@@ -95,6 +97,47 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         results[idx].lap_time = car.time_s;
         results[idx].top_speed_kmh = max_speed * 3.6f; 
         results[idx].battery_used_mj = car.battery_mj;
+    }
+}
+
+__global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track, int num_segments, TelemetryPoint* out_telemetry) {
+    F1Car car;
+
+    car.v = track[0].real_speed_kmh / 3.6f;
+    car.a = 0.0f;
+    car.battery_mj = 4.0f;
+    car.fuel_kg = 6.0f;
+    car.rpm = track[0].real_rpm;
+    car.current_gear = track[0].real_gear;
+    car.gear_shift_timer = 0.0f;
+    car.current_compound = TyreCompound::C3;
+    car.tyre_temp_front_c = 85.0f;
+    car.tyre_temp_rear_c = 85.0f;
+    car.tyre_wear_pct = 0.0f;
+    car.current_seg = 0;
+    car.current_m = 0.0f;
+    car.time_s = 0.0f;
+    car.qualifying_mode = false;
+    car.laps_completed = 0;
+    car.throttle_pedal = track[0].real_throttle_pedal;
+    car.brake_pedal = track[0].real_brake_pedal;
+
+    float dt = 0.002f;
+    int last_recorded_seg = -1;
+
+    while (car.laps_completed < 1 && car.time_s < 300.0f) {
+        if (car.current_seg != last_recorded_seg && car.current_seg < num_segments) {
+            out_telemetry[car.current_seg].speed_kmh = car.v * 3.6f;
+            out_telemetry[car.current_seg].rpm = car.rpm;
+            out_telemetry[car.current_seg].gear = car.current_gear;
+            out_telemetry[car.current_seg].throttle = car.throttle_pedal;
+            out_telemetry[car.current_seg].brake = car.brake_pedal;
+            out_telemetry[car.current_seg].time_s = car.time_s;
+            out_telemetry[car.current_seg].tyre_temp_front = car.tyre_temp_front_c;
+            out_telemetry[car.current_seg].tyre_temp_rear = car.tyre_temp_rear_c;
+            last_recorded_seg = car.current_seg;
+        }
+        step_physics(&car, &setup, track, num_segments, dt);
     }
 }
 
@@ -126,4 +169,55 @@ void run_simulation_batch(const CarSetup* setups, SimResult* results, const Trac
     cudaFree(d_setups);
     cudaFree(d_track);
     cudaFree(d_results);
+}
+
+void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* h_track, int num_segments) {
+    TrackSegment* d_track;
+    TelemetryPoint* d_telemetry;
+
+    size_t track_size = num_segments * sizeof(TrackSegment);
+    size_t telemetry_size = num_segments * sizeof(TelemetryPoint);
+
+    // Aloca pista e buffer de telemetria na GPU
+    cudaMalloc(&d_track, track_size);
+    cudaMalloc(&d_telemetry, telemetry_size);
+
+    // Copia a pista da RAM (CPU) para a VRAM (GPU)
+    cudaMemcpy(d_track, h_track, track_size, cudaMemcpyHostToDevice);
+
+    record_pole_telemetry<<<1, 1>>>(best_setup, d_track, num_segments, d_telemetry);
+    cudaDeviceSynchronize();
+
+    TelemetryPoint* h_telemetry = new TelemetryPoint[num_segments];
+    cudaMemcpy(h_telemetry, d_telemetry, telemetry_size, cudaMemcpyDeviceToHost);
+
+    std::ofstream file("../data/sim_telemetry_monza.csv");
+    if (!file.is_open()) {
+        std::cerr << "[CSV] Error opening ../data/sim_telemetry_monza.csv!\n";
+        delete[] h_telemetry;
+        cudaFree(d_track);
+        cudaFree(d_telemetry);
+        return;
+    }
+
+    file << "Distance_m,Sim_Speed,Sim_RPM,Sim_Gear,Sim_Throttle,Sim_Brake,Sim_Time_s,Tyre_Temp_Front_C,Tyre_Temp_Rear_C\n";
+
+    for (int i = 0; i < num_segments; ++i) {
+        file << i << ","
+             << h_telemetry[i].speed_kmh << ","
+             << h_telemetry[i].rpm << ","
+             << h_telemetry[i].gear << ","
+             << h_telemetry[i].throttle << ","
+             << h_telemetry[i].brake << ","
+             << h_telemetry[i].time_s << ","
+             << h_telemetry[i].tyre_temp_front << ","
+             << h_telemetry[i].tyre_temp_rear << "\n";
+    }
+
+    file.close();
+    std::cout << "[CPU] Telemetry Exported to: ../data/sim_telemetry_monza.csv\n";
+
+    delete[] h_telemetry;
+    cudaFree(d_track);
+    cudaFree(d_telemetry);
 }

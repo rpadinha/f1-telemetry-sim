@@ -109,9 +109,22 @@ struct SimResult {
     float battery_used_mj;              // Ammount of Battery Used in MJ (starting + what is regenerated)
 };
 
+// this was created to export data to csv better
+struct TelemetryPoint {
+    float speed_kmh;                    // Speed in segment in km/h
+    float rpm;                          // RPM in segment
+    int gear;                           // Gear in segment
+    float throttle;
+    float brake;
+    float time_s;
+    float tyre_temp_front;
+    float tyre_temp_rear;
+};
+
 CUDA_CALLABLE void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt);
 
 // This will start the kernel
 void run_simulation_batch(const CarSetup* setups, SimResult* results, const TrackSegment* track, int num_segments, int numSetups);
+void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* d_track, int num_segments);
 
 #endif
