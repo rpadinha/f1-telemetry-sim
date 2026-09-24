@@ -1,6 +1,6 @@
-# F1 High-Performance Physics and Telemetry Simulator
+# F1 Physics and Telemetry Simulator
 
-A high-performance Formula 1 simulation engine built from the ground up in C++ and CUDA. This project bridges the gap between theoretical vehicle dynamics and real-world racing by running a custom predictive physics AI against actual track telemetry (extracted via FastF1). 
+A Formula 1 simulation engine built from the ground up in C++ and CUDA. This project bridges the gap between theoretical vehicle dynamics and real-world racing by running a custom predictive physics AI against actual track telemetry (extracted via FastF1). 
 
 Designed to process multiple aerodynamic and powertrain configurations concurrently using GPU parallelization, the engine visualizes the physics calculations in real-time via a custom SFML telemetry HUD.
 
@@ -10,7 +10,7 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 <img width="1280" height="720" alt="Kooha-2026-09-15-19-59-34" src="https://github.com/user-attachments/assets/8e9bb48c-b047-46be-bf78-c386b4e02b25" />
 
 # Current state of the project
-We are testing only on Max Verstappen's pole position around Monza in 2025, with a time of **01:18.792** our model currently simulates a full lap with starter paramenters equal to the real data in **01:11:348** meaning we have a seven to eight seconds quicker than reality permits. Below this segment it's available all equations currently being used to limit and run the car around the track to simulate a f1 car. This simulator models what a single-seater would do in an **ideal, frictionless vacuum**, and the driver having **godlike reflexes** as of this moment.
+We are testing only on Max Verstappen's pole position around Monza in 2025, with a time of **01:18.792** our model currently simulates a full lap with starter paramenters equal to the real data in **01:11:348** meaning we are seven to eight seconds quicker than reality permits. Below this segment it's available all equations currently being used to limit and run the car around the track to simulate a f1 car. This simulator models what a single-seater would do in an **ideal, frictionless vacuum**, and the driver having **godlike reflexes** as of this moment. This has changed and now our simulation does a lower time of **01:20.436**.
 
 For aerodynamics, the equations mentioned below are **Drag Force**, that works as a natural brake imposed by the athmosphere, it defines the top speed of the car in a straight line withoout this the car would be a rocket. **Drag Reduction System or DRS** for short is a 35% cut in aero drag in permited zones (this is for the 2022-2025 regulations), allowing to gain 15km/h to 25km/h in the permitted zones. The last one is **Downforce** which pushes the single-seater against the ground according to its speed. This force generates vertical load without adding inertial mass.
 
@@ -55,9 +55,10 @@ Things we need to add to make it more humanlike:
 
 ## Environment and Requirements
 
-* **Operating System:** Linux (Developed and optimized on Ubuntu 26.04)
-* **Hardware:** NVIDIA GPU with CUDA architecture support (Validated on RTX 2070 Super) - **CUDA is required to run the engine.**
+* **Operating System:** Linux
+* **Hardware:** NVIDIA GPU with CUDA architecture support (Validated on RTX 2070 Super)
 * **Dependencies:** `sfml-graphics`, `sfml-window`, `sfml-system`, `nvcc`, `cmake`
+* **Python Libraries** FastF1, numpy, pandas...
 
 ## Build and Execution
 
@@ -71,6 +72,16 @@ Things we need to add to make it more humanlike:
    cmake ..
    make
    
-3. Run the simulation:
+3. Add needed telemetry data from the `fetch_f1data.py` (**fastf1 library needed to run**):
+   ```bash
+   python3 fetch_f1data.py
+   ```
+
+4. Run the simulation:
    ```bash
    ./f1-telemetry-sim
+
+5. Graphics creation:
+   ```bash
+   python3 plot_comparisons.py
+   ```
