@@ -51,7 +51,7 @@ __host__ __device__ inline void update_tyres(F1Car* car, const F1CarDynamics dyn
         (car->a > 0.0f) ? 0.60f : 0.40f  // RR
     };
 
-    float air_cooling_factor = 0.015f * sqrt(car->v + 1.0f);
+    float air_cooling_factor = 0.014f * sqrt(car->v + 1.0f);
 
     for (int i = 0 ; i < 4 ; i++) {
         // The force this tyre suffers is based on the weight percentage

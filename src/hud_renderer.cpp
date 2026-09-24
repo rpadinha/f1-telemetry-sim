@@ -1,4 +1,4 @@
-#include "hud_renderer.hpp"
+#include "hud_renderer.h"
 #include <algorithm>
 
 HudManager::HudManager(float window_width, float window_height) 

@@ -21,5 +21,6 @@ add_executable(f1-telemetry-sim
     src/physics.cu
     src/sim_driver.cu
 )
+
 set_target_properties(f1-telemetry-sim PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # this is needed for multiple cu files
 target_link_libraries(f1-telemetry-sim sfml-graphics sfml-window sfml-system)

@@ -1,6 +1,6 @@
 #include "visualizer.h"
 #include "config.cuh"
-#include "hud_renderer.hpp"
+#include "hud_renderer.h"
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <algorithm>

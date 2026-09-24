@@ -147,6 +147,7 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
         case DriverAction::BRAKE:
             dynamics.desired_braking_force = dynamics.total_mass * Config::DECEL_RATE;
             target_brake = 1.0f;
+            car->throttle_pedal = 0.0f;
             break;
             
         case DriverAction::COAST:
