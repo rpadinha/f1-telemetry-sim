@@ -11,9 +11,9 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 
 # Current state of the project
 Right now the program imports and exports data automatically so when you run it, picking a year, grand prix and session(for now only qualifying is suported) it will spew results for the visualization made in SFML and after you close the SFML window, a python script in `scripts/` will plot to the existing data folder already the `.pngs` generated for it here's an example:
-![plot](./data/2025_monza_q_performance.png)
-![plot](./data/2025_monza_q_inputs.png)
-![plot](./data/2025_monza_q_thermals.png)
+![plot](./assets/2025_monza_q_performance.png)
+![plot](./assets/2025_monza_q_inputs.png)
+![plot](./assets/2025_monza_q_thermals.png)
 
 ### Mathematical Modeling & Physics Formulation
 
