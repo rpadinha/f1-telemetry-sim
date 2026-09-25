@@ -23,4 +23,7 @@ add_executable(f1-telemetry-sim
 )
 
 set_target_properties(f1-telemetry-sim PROPERTIES CUDA_SEPARABLE_COMPILATION ON) # this is needed for multiple cu files
+target_compile_definitions(f1-telemetry-sim PRIVATE 
+    PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+)
 target_link_libraries(f1-telemetry-sim sfml-graphics sfml-window sfml-system)

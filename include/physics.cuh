@@ -7,6 +7,8 @@
 #define CUDA_CALLABLE
 #endif
 
+#include <string>
+
 enum class TyreCompound {
     C1 = 0,
     C2 = 1,
@@ -30,7 +32,7 @@ struct TyreProperties {
     float wear_rate;                    // for each meter the ammount of wear
 };
 
-// the data that goes into the gpu
+// struct for setup data (goes into gpu)
 struct CarSetup {
     int id;                             // setup id
     float mass_kg;                      // Mass of the car
@@ -44,12 +46,13 @@ struct F1Car {
     float a;                            // Linear acceleration
     float v;                            // Velocity of the car
     
+    // time on track, and current m and current segment
     int current_seg;                    // Position of the car (segment of the circuit)
     float current_m;                    // Current meter of the circuit
     float time_s;                       // Time on track (resets after going through finish line)
 
+    // action and pedals
     DriverAction action;                 // Current driver action
-
     float throttle_pedal;                // Throttle pedal position (0.0 to 1.0)
     float brake_pedal;                   // Brake pedal position (0.0 to 1.0)
 
@@ -58,6 +61,7 @@ struct F1Car {
     float rpm;                          // Current RPM of the car
     float gear_shift_timer;             // ignition cut timer for upshifts (seconds)
 
+    // Tyres (yeah i know its a lot)
     TyreCompound current_compound;      // Current tyre of the car (C1-hardest - C5-softest)
     float tyre_temp_fl;                 // Front-Left
     float tyre_temp_fr;                 // Front-Right
@@ -69,17 +73,18 @@ struct F1Car {
     float tyre_wear_rl;                 // Rear-Left
     float tyre_wear_rr;                 // Rear-Right
 
+    // battery and fuel
     float battery_mj;                   // Ammount of battery
     float fuel_kg;                      // Ammount of fuel
 
+    // states for drs and modes
     bool drs_open;                      // drs boolean
-
     bool qualifying_mode;               // this is just cool to add for now but it states if its in qualifying mode or not, if it is then the car will not regenerate energy and will use more power to simulate a qualifying lap
 
     int laps_completed;                 // amount of laps completed by the sim for controlling better
 };
 
-// keeps the dynamics of the car each dt (this has been made bigger to hold all math made in basic functions)
+// keeps the dynamics of the car each dt
 struct F1CarDynamics {
     float total_mass;                   // mass_kg + fuel
     float pitch_angle;                  // track pitch
@@ -103,7 +108,7 @@ struct F1CarDynamics {
     float load_rr;                      // rear right load
 };
 
-// track segment
+// track segment struct for track handling
 struct TrackSegment {
     float length_m;                     // Length of the segment
     float radius_m;                     // Radius of the segment (< 10000 means curvature)
@@ -118,7 +123,7 @@ struct TrackSegment {
     float real_brake_pedal;             // Real value of brake pedal
 };
 
-// Results
+// struct for results by cuda
 struct SimResult {
     int setup_id;                       // Setup Id
     float lap_time;                     // Lap Time
@@ -126,22 +131,23 @@ struct SimResult {
     float battery_used_mj;              // Ammount of Battery Used in MJ (starting + what is regenerated)
 };
 
-// this was created to export data to csv better
+// struct to export telemetry data from best setup
 struct TelemetryPoint {
     float speed_kmh;                    // Speed in segment in km/h
     float rpm;                          // RPM in segment
     int gear;                           // Gear in segment
-    float throttle;
-    float brake;
-    float time_s;
-    float tyre_temp_front;
-    float tyre_temp_rear;
+    float throttle;                     // throttle (%)
+    float brake;                        // brake (%)
+    float time_s;                       // time s
+    float tyre_temp_front;              // average temp front
+    float tyre_temp_rear;               // average temp rear
 };
 
+// step physics for both visualizer and simulate lap cuda device code (CUDA_CALLABLE)
 CUDA_CALLABLE void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt);
-
-// This will start the kernel
+// runs the simulate lap for N setups using the step_physics integration
 void run_simulation_batch(const CarSetup* setups, SimResult* results, const TrackSegment* track, int num_segments, int numSetups);
-void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* d_track, int num_segments);
+// exports the best setup for csv
+void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* d_track, int num_segments, std::string year, std::string gp, std::string session);
 
 #endif

@@ -1,7 +1,6 @@
 #include "sim_driver.cuh"
 #include <math.h>
 
-// getting max deceleration
 __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu) {
     // first we calculate the aerodynamics at current speed v_ms
     float drag = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * setup->drag_coef * Config::FRONTAL_AREA;
@@ -22,7 +21,6 @@ __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, co
     return total_brake_force / setup->mass_kg + (Config::GRAVITY * sinf(pitch_angle));
 }
 
-// getting allowed speed
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
     float current_pitch = get_track_pitch_angle(track, car->current_seg, num_segments);
     float base_mu = calculate_effective_grip(car);
@@ -77,7 +75,6 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
     return speed;
 }
 
-// for now deploying eletric energy based on battery soc, speed and upcoming straight length
 __host__ __device__ float calculate_mguk_deployment(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
     if (car->action != DriverAction::ACCELERATE || car->v < 16.6f || car->battery_mj <= 0.f || car->current_gear <= 3) {
         return 0.0f;
@@ -116,7 +113,6 @@ __host__ __device__ float calculate_mguk_deployment(const F1Car* car, const CarS
     return ratio;
 }
 
-// ers fucntion independent from other code
 __host__ __device__ void update_ers(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
     if (car->throttle_pedal > 0.0f) {
         float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
@@ -138,7 +134,6 @@ __host__ __device__ void update_ers(F1Car* car, const CarSetup* setup, const Tra
     }
 }
 
-// updating driver pedals
 __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
     float target_throttle = 0.0f;
     float target_brake = 0.0f;

@@ -1,5 +1,6 @@
-#include <fstream>
-#include <iostream>
+#include <fstream>                  // for export_sim_telemetry
+#include <string>                   // for file name thing
+#include <iostream>                 // for export_sim_telemetry
 #include "physics.cuh"              // gives acess to structs and functions made in cuda
 #include "config.cuh"               // gives acess to global config variables
 #include "engine.cuh"               // gives acess to engine functions
@@ -20,12 +21,11 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
         car->action = DriverAction::ACCELERATE;
     }
 
-    // coast thing? should i add this?
-    /*
+    
     if (!car->qualifying_mode && car->v > speed - 3.0f && car->v <= speed + 0.2f) {
         car->action = DriverAction::COAST;
     }
-    */
+    
     
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
@@ -38,10 +38,10 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
 
     float net_force = compute_net_force(car, dynamics);
 
-    float a = net_force / dynamics.total_mass;
-    car->a = a;                         // accel
-    car->v += a * dt;                   // vel
-    if (car->v < 0.0f) car->v = 0.0f; // Prevent reverse tracking bugs
+    float a = net_force / dynamics.total_mass;  // nice using dynamics
+    car->a = a;                                 // accel
+    car->v += a * dt;                           // vel
+    if (car->v < 0.0f) car->v = 0.0f;           // Prevent reverse tracking bugs
     car->current_m += car->v * dt;
     car->time_s += dt;
 
@@ -59,7 +59,6 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     update_tyres(car, dynamics, setup, dt);
 }
 
-// Cuda Kernel
 __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num_setups, const TrackSegment* track, int num_segments) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     
@@ -185,7 +184,7 @@ void run_simulation_batch(const CarSetup* setups, SimResult* results, const Trac
     cudaFree(d_results);
 }
 
-void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* h_track, int num_segments) {
+void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* h_track, int num_segments, std::string year, std::string gp, std::string session) {
     TrackSegment* d_track;
     TelemetryPoint* d_telemetry;
 
@@ -205,9 +204,10 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
     TelemetryPoint* h_telemetry = new TelemetryPoint[num_segments];
     cudaMemcpy(h_telemetry, d_telemetry, telemetry_size, cudaMemcpyDeviceToHost);
 
-    std::ofstream file("../data/sim_telemetry_monza.csv");
+    std::string export_path = "../data/" + year + "_" + gp + "_" + session + "_sim.csv";
+    std::ofstream file(export_path);
     if (!file.is_open()) {
-        std::cerr << "[CSV] Error opening ../data/sim_telemetry_monza.csv!\n";
+        std::cerr << "[CSV] Error opening" + export_path + "!\n";
         delete[] h_telemetry;
         cudaFree(d_track);
         cudaFree(d_telemetry);
@@ -229,7 +229,7 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
     }
 
     file.close();
-    std::cout << "[CPU] Telemetry Exported to: ../data/sim_telemetry_monza.csv\n";
+    std::cout << "[GPU/CPU] Telemetry Exported to: " + export_path + "\n";
 
     delete[] h_telemetry;
     cudaFree(d_track);

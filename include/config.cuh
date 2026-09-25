@@ -17,13 +17,12 @@ namespace Config {
 
     // Car Limits
     constexpr float DECEL_RATE = 49.0f;                 // Deceleration rate in m/s^2
-    constexpr float BASE_MECH_GRIP = 1.6f;              // Mechanical grip coefficient
-    constexpr float ICE_MIN_FORCE = 15000.f;            // ICE minimum force in Newtons
     constexpr float WHEEL_RADIUS = 0.36f;               // Wheel radius in meters
     constexpr float WHEEL_BASE = 3.6f;                  // Wheelbase of the car in m
     constexpr float FINAL_DRIVE = 5.0f;                 // Rear Differential
     constexpr float GRAVITY_CENTER_HEIGHT = 0.30f;      // Gravity center height of the f1 car in m
     constexpr float FUEL_FLOW_KG_S = 100.0f / 3600.0f;  // max fuel flow in
+
     // Gear Ratios and RPM Limits
     // so here we got error: identifier "Config::GEAR_RATIOS" is undefined in device code
     /*constexpr float GEAR_RATIOS[8] = {3.2f, 2.6f, 2.1f, //
@@ -66,8 +65,8 @@ namespace Config {
     }
 
     // track and ambient
-    constexpr float AMBIENT_TEMP_C = 25.0f;
-    constexpr float TRACK_TEMP_C = 42.0f;
+    constexpr float AMBIENT_TEMP_C = 25.0f;             // ambient temperature
+    constexpr float TRACK_TEMP_C = 42.0f;               // track temperture
 
     // ERS System (MGU-K)
     constexpr float MAX_BATTERY_MJ = 4.0f;              // Maximum battery capacity in MegaJoules

@@ -8,21 +8,7 @@
 
 __host__ __device__ inline bool is_straight(float radius_m, const CarSetup* setup) {
     /*
-    if (radius_m >= 10000.0f) { return true; } // its a perfect straight
-
-    // V^2 * (mass/R - 0.5 * rho * Cl * A * mu) = mass * g * mu
-    float cl_a = (setup->drag_coef * 3.0f) * Config::FRONTAL_AREA;
-    float aero_term = 0.5f * Config::AIR_DENSITY * cl_a * Config::BASE_MECH_GRIP;
-    float mechanical_term = setup->mass_kg / radius_m;
-
-    if (mechanical_term <= aero_term) { return true; } // if the aero part is faster than centrifugal force the car sticks
-    
-    float denom = mechanical_term - aero_term; if (denom < 1e-5f) {return true}
-
-    float max_v_sq = (setup->mass_kg * Config::GRAVITY * Config::BASE_MECH_GRIP) / denom;
-
-    // 97.5m/s -> 351km/h
-    return max_v_sq > (97.5f * 97.5f);
+    previously there was a bigger determination to see if it was a corner here
     */
     return radius_m >= 800.f;               // any corner radius above 800m is effectively a straight
 }

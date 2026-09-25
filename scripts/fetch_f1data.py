@@ -1,101 +1,121 @@
+import sys
 import os
 import fastf1
 import numpy as np
 import pandas as pd
 from scipy.interpolate import pchip_interpolate
 
-print("Initializing FastF1...")
 
-if not os.path.exists("cache"):
-  os.makedirs("cache")
-fastf1.Cache.enable_cache("cache")
+def main():
+    print("Initializing FastF1...")
 
-# Loading the session data (Ex: Monza 2025 Qualifying)
-session = fastf1.get_session(2025, "Monza", "Q")
-session.load(telemetry=True, weather=False, messages=False)
+    if len(sys.argv) < 4:
+       print("Error: Not enough args in python? how?", file=sys.stderr)
+       sys.exit(1)
 
-lap = session.laps.pick_fastest()
-tel = lap.get_telemetry()
-print(
-    f"Telemetry loaded. {lap['Driver']} set the fastest lap: {lap['LapTime']}."
-)
 
-# Interpolating telemetry data to have a uniform distance step (1 meter) for better curvature calculation
-# and x, y. z speed. rpm and gear.
-original_distance = tel["Distance"].to_numpy()
-total_distance = original_distance[-1]
-# Fixed segments of 1 meter
-uniform_distance = np.arange(0, total_distance, 1.0)
+    year = int(sys.argv[1])
+    gp = sys.argv[2]
+    session_type = sys.argv[3]
+    print(f"Getting {year} {gp} {session_type}")
 
-# Interpolate
-# Using 'pchip' (Piecewise Cubic Hermite Interpolating Polynomial)
-x_interp = pchip_interpolate(original_distance, tel["X"].to_numpy(), uniform_distance)
-y_interp = pchip_interpolate(original_distance, tel["Y"].to_numpy(), uniform_distance)
-z_interp = pchip_interpolate(original_distance, tel["Z"].to_numpy(), uniform_distance)
-speed_interp = pchip_interpolate(original_distance, tel["Speed"].to_numpy(), uniform_distance)
-rpm_interp = pchip_interpolate(original_distance, tel["RPM"].to_numpy(), uniform_distance)
-# nGear goes from 1 to 8, so we can round the interpolated values to the nearest integer
-gear_interp = np.round(pchip_interpolate(original_distance, tel["nGear"].to_numpy(), uniform_distance)).astype(int)
-throttle_pedal_interp = np.round(pchip_interpolate(original_distance, tel["Throttle"].to_numpy(), uniform_distance))
-brake_pedal_interp = np.round(pchip_interpolate(original_distance, tel["Brake"].to_numpy(), uniform_distance))
-is_drs_zone = np.round(pchip_interpolate(original_distance, tel["DRS"].to_numpy(), uniform_distance))
-is_drs_zone = np.where(is_drs_zone >= 10, 1, 0) # transforming into 1 or 0 true or false
 
-df = pd.DataFrame({
-    "Distance": uniform_distance,
-    "X": x_interp,
-    "Y": y_interp,
-    "Z": z_interp,
-    "Real Speed": speed_interp,
-    "RPM": rpm_interp,
-    "nGear": gear_interp,
-    "Throttle": throttle_pedal_interp,
-    "Brake": brake_pedal_interp,
-    "DRS": is_drs_zone
-})
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cache_dir = os.path.join(script_dir, "cache")
+    if not os.path.exists(cache_dir):
+      os.makedirs(cache_dir)
+    fastf1.Cache.enable_cache(cache_dir)
 
-df["Throttle"] = df["Throttle"] / 100
+    # Loading the session data (Ex: Monza 2025 Qualifying)
+    session = fastf1.get_session(year, gp, session_type)
+    session.load(telemetry=True, weather=False, messages=False)
 
-# Track Rotation
-circuit_info = session.get_circuit_info()
-# Converts the oficial circuit rotation
-angle_rad = -circuit_info.rotation / 180 * np.pi
+    lap = session.laps.pick_fastest()
+    tel = lap.get_telemetry()
+    print(
+        f"Telemetry loaded. {lap['Driver']} set the fastest lap: {lap['LapTime']}."
+    )
 
-cos_theta = np.cos(angle_rad)
-sin_theta = np.sin(angle_rad)
+    # Interpolating telemetry data to have a uniform distance step (1 meter) for better curvature calculation
+    # and x, y. z speed. rpm and gear.
+    original_distance = tel["Distance"].to_numpy()
+    total_distance = original_distance[-1]
+    # Fixed segments of 1 meter
+    uniform_distance = np.arange(0, total_distance, 1.0)
 
-# Appliying the correct rotation
-x_rot = df["X"] * cos_theta - df["Y"] * sin_theta
-y_rot = df["X"] * sin_theta + df["Y"] * cos_theta
+    # Interpolate
+    # Using 'pchip' (Piecewise Cubic Hermite Interpolating Polynomial)
+    x_interp = pchip_interpolate(original_distance, tel["X"].to_numpy(), uniform_distance)
+    y_interp = pchip_interpolate(original_distance, tel["Y"].to_numpy(), uniform_distance)
+    z_interp = pchip_interpolate(original_distance, tel["Z"].to_numpy(), uniform_distance)
+    speed_interp = pchip_interpolate(original_distance, tel["Speed"].to_numpy(), uniform_distance)
+    rpm_interp = pchip_interpolate(original_distance, tel["RPM"].to_numpy(), uniform_distance)
+    # nGear goes from 1 to 8, so we can round the interpolated values to the nearest integer
+    gear_interp = np.round(pchip_interpolate(original_distance, tel["nGear"].to_numpy(), uniform_distance)).astype(int)
+    throttle_pedal_interp = np.round(pchip_interpolate(original_distance, tel["Throttle"].to_numpy(), uniform_distance))
+    brake_pedal_interp = np.round(pchip_interpolate(original_distance, tel["Brake"].to_numpy(), uniform_distance))
+    is_drs_zone = np.round(pchip_interpolate(original_distance, tel["DRS"].to_numpy(), uniform_distance))
+    is_drs_zone = np.where(is_drs_zone >= 10, 1, 0) # transforming into 1 or 0 true or false
 
-df["X"] = x_rot
-df["Y"] = y_rot
+    df = pd.DataFrame({
+        "Distance": uniform_distance,
+        "X": x_interp,
+        "Y": y_interp,
+        "Z": z_interp,
+        "Real Speed": speed_interp,
+        "RPM": rpm_interp,
+        "nGear": gear_interp,
+        "Throttle": throttle_pedal_interp,
+        "Brake": brake_pedal_interp,
+        "DRS": is_drs_zone
+    })
 
-# Curvature radius calculation
-dx = np.gradient(df["X"])
-dy = np.gradient(df["Y"])
-ddx = np.gradient(dx)
-ddy = np.gradient(dy)
+    df["Throttle"] = df["Throttle"] / 100
 
-denominator = (dx**2 + dy**2) ** 1.5 + 1e-8
-curvature = np.abs(dx * ddy - dy * ddx) / denominator
+    # Track Rotation
+    circuit_info = session.get_circuit_info()
+    # Converts the oficial circuit rotation
+    angle_rad = -circuit_info.rotation / 180 * np.pi
 
-# Defines the maximum radius for curves
-df["Radius"] = np.where(curvature > 1e-3, 1 / curvature, 10000)
+    cos_theta = np.cos(angle_rad)
+    sin_theta = np.sin(angle_rad)
 
-# Smoothing
-df["Radius"] = (
-    df["Radius"].rolling(window=5, min_periods=1, center=True).mean()
-)
+    # Appliying the correct rotation
+    x_rot = df["X"] * cos_theta - df["Y"] * sin_theta
+    y_rot = df["X"] * sin_theta + df["Y"] * cos_theta
 
-# Segment length now will be always 1 meter
-df["Segment_Length"] = df["Distance"].diff().fillna(df["Distance"].iloc[0])
+    df["X"] = x_rot
+    df["Y"] = y_rot
 
-# Exporting to ../data folder
-if not os.path.exists("../data"):
-  os.makedirs("../data")
+    # Curvature radius calculation
+    dx = np.gradient(df["X"])
+    dy = np.gradient(df["Y"])
+    ddx = np.gradient(dx)
+    ddy = np.gradient(dy)
 
-output_path = "../data/monza_pole.csv"
-df[["Segment_Length", "Radius", "X", "Y", "Z", "DRS", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
+    denominator = (dx**2 + dy**2) ** 1.5 + 1e-8
+    curvature = np.abs(dx * ddy - dy * ddx) / denominator
 
-print(f"Success! Exported {len(df)} segments to {output_path}")
+    # Defines the maximum radius for curves
+    df["Radius"] = np.where(curvature > 1e-3, 1 / curvature, 10000)
+
+    # Smoothing
+    df["Radius"] = (
+        df["Radius"].rolling(window=5, min_periods=1, center=True).mean()
+    )
+
+    # Segment length now will be always 1 meter
+    df["Segment_Length"] = df["Distance"].diff().fillna(df["Distance"].iloc[0])
+
+    # Exporting to ../data folder
+    if not os.path.exists("../data"):
+      os.makedirs("../data")
+
+    output_path = f"../data/{year}_{gp}_{session_type}.csv"
+
+    df[["Segment_Length", "Radius", "X", "Y", "Z", "DRS", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
+
+    print(f"Success! Exported {len(df)} segments to {output_path}")
+
+if __name__ == "__main__":
+    main()

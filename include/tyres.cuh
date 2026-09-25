@@ -5,9 +5,7 @@
 #include "physics.cuh"
 #include <math.h>
 
-// Instantaneous Effective Friction (mu_eff)
 // calculates dynamic grip based on tire compound, thermal window and wear
-
 __host__ __device__ inline float calculate_tyre_grip(TyreCompound compound, float temp_c, float wear_pct) {
     TyreProperties properties = Config::get_tyre_properties(compound);
 
@@ -52,7 +50,7 @@ __host__ __device__ inline void update_tyres(F1Car* car, const F1CarDynamics dyn
     };
 
     float air_cooling_factor = 0.014f * sqrt(car->v + 1.0f);
-
+    
     for (int i = 0 ; i < 4 ; i++) {
         // The force this tyre suffers is based on the weight percentage
         float load_ratio = loads[i] / total_load;

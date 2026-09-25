@@ -5,6 +5,7 @@
 #include <string>
 #include "physics.cuh"
 
+// circuit loader from csv file
 std::vector<TrackSegment> load_circuit_csv(const std::string& filename);
 
 #endif
