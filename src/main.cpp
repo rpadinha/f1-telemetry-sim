@@ -18,8 +18,8 @@
 int main(int argc, char* argv[]) {
 
     if (argc < 4) {
-        std::cout << "Correct usage: " << argv[0] << "<year> <track> <session>" << std::endl;
-        std::cout << "example: " << argv[0] << "2023 Baku Q" << std::endl;
+        std::cout << "Correct usage: " << argv[0] << " <year> <track> <session>" << std::endl;
+        std::cout << "example: " << argv[0] << " 2023 Baku Q" << std::endl;
         return 1;
     }
 
@@ -54,9 +54,6 @@ int main(int argc, char* argv[]) {
     std::vector<CarSetup> setups(Config::NUM_SETUPS);
     std::vector<SimResult> results(Config::NUM_SETUPS);
 
-
-    // after getting the battery and fixing some imperfections as to not taking the Z of the track, we will 
-    // see different ways to change setups*
     std::mt19937 gen(888); 
     std::uniform_real_distribution<float> ice_dist(380.0f, 420.0f);
     std::uniform_real_distribution<float> mguk_dist(300.0f, 350.0f);

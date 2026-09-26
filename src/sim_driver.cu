@@ -139,15 +139,19 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
     float target_brake = 0.0f;
 
     switch (car->action) {
-        case DriverAction::BRAKE:
-            dynamics.desired_braking_force = dynamics.total_mass * Config::DECEL_RATE;
-            target_brake = 1.0f;
+        case DriverAction::BRAKE: {
+            float lateral_usage = (dynamics.max_grip > 1e-3f) ? (dynamics.lateral_force / dynamics.max_grip) : 0.0f;
+
+            target_brake = 1.0f - (lateral_usage * 0.7f);
+            if (target_brake < 0.2f) { target_brake = 0.2f; }
+            target_throttle = 0.0f;
             car->throttle_pedal = 0.0f;
             break;
-            
-        case DriverAction::COAST:
+        }
+        case DriverAction::COAST: {
             break;
-            
+        }
+
         case DriverAction::ACCELERATE: {
             float mguk_ratio = calculate_mguk_deployment(car, setup, track, num_segments);
             float mguk_power = (mguk_ratio > 0.0f) ? (setup->mguk_power_kw * mguk_ratio) : 0.0f;

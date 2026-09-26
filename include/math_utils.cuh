@@ -117,7 +117,9 @@ __host__ __device__ inline float compute_net_force(const F1Car* car, const F1Car
 
     switch (car->action) {
         case DriverAction::BRAKE: {
-            float applied_brake_force = car->brake_pedal * dynamics.desired_braking_force;
+            float requested_brake = car->brake_pedal * Config::MAX_BRAKE_SYSTEM_FORCE; // 45000N max limit on brakes
+            float applied_brake_force = (requested_brake > dynamics.long_grip) ? dynamics.long_grip : requested_brake;
+
             net_force = -applied_brake_force - dynamics.drag_force - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
             break;
         }
@@ -127,6 +129,7 @@ __host__ __device__ inline float compute_net_force(const F1Car* car, const F1Car
         }
         case DriverAction::ACCELERATE: {
             float applied_engine_force = car->throttle_pedal * dynamics.desired_engine_force;
+            
             net_force = applied_engine_force - dynamics.drag_force + dynamics.gravity_longitudinal;
             break;
         }

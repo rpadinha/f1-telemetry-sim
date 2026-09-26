@@ -15,18 +15,16 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
 
     // just brake or accelerate
     // coasting is still meh
-    if (car->v > speed + 0.2f) {
+    if (car->v > speed + 1.0f) {
+        car->action = DriverAction::BRAKE;
+    } else if (car->action == DriverAction::ACCELERATE && car->v > speed - 4.0f) {
+        car->action = DriverAction::COAST;
+    } else if (car->action == DriverAction::BRAKE && car->v > speed - 2.0f) {
         car->action = DriverAction::BRAKE;
     } else {
         car->action = DriverAction::ACCELERATE;
     }
 
-    
-    if (!car->qualifying_mode && car->v > speed - 3.0f && car->v <= speed + 0.2f) {
-        car->action = DriverAction::COAST;
-    }
-    
-    
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
     // creating a new car dynamics everytime is weird

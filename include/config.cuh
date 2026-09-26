@@ -11,17 +11,17 @@
 
 namespace Config {
     // Physics and ambient
-    constexpr float AIR_DENSITY = 1.225f;               // Air density in kg/m^3
-    constexpr float FRONTAL_AREA = 1.5f;                // Frontal area of the car in m^2
-    constexpr float GRAVITY = 9.81f;                    // Gravitational acceleration in m/s^2
+    constexpr float AIR_DENSITY = 1.225f;               // Air density in (Kg/m³)
+    constexpr float FRONTAL_AREA = 1.5f;                // Frontal area of the car in (m²)
+    constexpr float GRAVITY = 9.81f;                    // Gravitational acceleration (m/s²)
 
     // Car Limits
-    constexpr float DECEL_RATE = 49.0f;                 // Deceleration rate in m/s^2
-    constexpr float WHEEL_RADIUS = 0.36f;               // Wheel radius in meters
-    constexpr float WHEEL_BASE = 3.6f;                  // Wheelbase of the car in m
+    constexpr float MAX_BRAKE_SYSTEM_FORCE = 45000.0f;  // Max Gripping force of the pincers (N)
+    constexpr float WHEEL_RADIUS = 0.36f;               // Wheel radius (m)
+    constexpr float WHEEL_BASE = 3.6f;                  // Wheelbase of the car (m)
     constexpr float FINAL_DRIVE = 5.0f;                 // Rear Differential
-    constexpr float GRAVITY_CENTER_HEIGHT = 0.30f;      // Gravity center height of the f1 car in m
-    constexpr float FUEL_FLOW_KG_S = 100.0f / 3600.0f;  // max fuel flow in
+    constexpr float GRAVITY_CENTER_HEIGHT = 0.30f;      // Gravity center height of the f1 car (m)
+    constexpr float FUEL_FLOW_KG_S = 100.0f / 3600.0f;  // max fuel flow (Kg/s)
 
     // Gear Ratios and RPM Limits
     // so here we got error: identifier "Config::GEAR_RATIOS" is undefined in device code
@@ -29,7 +29,7 @@ namespace Config {
                                       1.7f, 1.4f, 1.2f, //
                                       1.0f, 0.9f};      */
                                       //
-    // instead we will use the CUDA_CALLABLE to make accessible in device code
+    // gear ratios for each of the gear
     CUDA_CALLABLE inline float get_gear_ratio(int gear) {
         // added static because static const forces the compiler to bake this directly into registers or uniform memory
         static const float ratios[8] = {3.2f, 2.6f, 2.1f, 1.7f, 1.4f, 1.2f, 1.0f, 0.9f};
@@ -37,7 +37,7 @@ namespace Config {
         if (gear > 8) gear = 8;
         return ratios[gear - 1];
     }
-    constexpr float RPM_REDLINE = 12500.0f;             // Redline RPM of the car // wowzers
+    constexpr float RPM_REDLINE = 12800.0f;             // Redline RPM of the car // wowzers
     constexpr float RPM_UPSHIFT = 11800.0f;             // Ideal upshift RPM of the car
     constexpr float RPM_DOWNSHIFT = 7500.0f;            // Ideal downshift RPM of the car
     constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power
@@ -65,17 +65,17 @@ namespace Config {
     }
 
     // track and ambient
-    constexpr float AMBIENT_TEMP_C = 25.0f;             // ambient temperature
-    constexpr float TRACK_TEMP_C = 42.0f;               // track temperture
+    constexpr float AMBIENT_TEMP_C = 25.0f;             // ambient temperature (Cº)
+    constexpr float TRACK_TEMP_C = 42.0f;               // track temperture (Cº)
 
     // ERS System (MGU-K)
-    constexpr float MAX_BATTERY_MJ = 4.0f;              // Maximum battery capacity in MegaJoules
-    constexpr float MGUK_REGEN_KW = 350.0f;             // Maximum regenerative power of the MGU-K in kW
+    constexpr float MAX_BATTERY_MJ = 4.0f;              // Maximum battery capacity (MJ)
+    constexpr float MGUK_REGEN_KW = 350.0f;             // Maximum regenerative power of the MGU-K (kW)
 
     // Simulation Parameters
-    constexpr int LOOKAHEAD_METERS = 300;               // Lookahead distance in meters
-    constexpr float PHYSICS_DT = 0.002f;                // Physics timestep in seconds
-    constexpr int NUM_SETUPS = 1000;                    // Number of setups to simulate
+    constexpr int LOOKAHEAD_METERS = 300;               // Lookahead distance (m)
+    constexpr float PHYSICS_DT = 0.002f;                // Physics timestep (s)
+    constexpr int NUM_SETUPS = 100;                    // Number of setups to simulate
 }
 
 #endif
