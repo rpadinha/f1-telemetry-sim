@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 def main():
     print("[PYTHON] Plotting comparisons of sim vs real (splitting into focused graphs)...")
     if len(sys.argv) < 3:
-        print("[PYTHON] Error: Missing file arguments. Usage: script.py <path_real> <path_sim>", file=sys.stderr)
+        print("[PYTHON] Error: Missing file arguments. Usage: plot_comparisons.py <path_real> <path_sim>", file=sys.stderr)
         sys.exit(1)
 
     path_real = sys.argv[1]

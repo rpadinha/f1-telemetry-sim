@@ -14,7 +14,15 @@ Right now the program imports and exports data automatically so when you run it,
 ![plot](./assets/2025_monza_q_performance.png)
 ![plot](./assets/2025_monza_q_inputs.png)
 ![plot](./assets/2025_monza_q_thermals.png)
+![plot](./assets/2025_monza_q_dynamics.png)
 
+The dynamics plot shows us some bugs:
+ - Sim Net Longitudinal force and Desired engine force are glued to zero
+ - The car thinks all corners are to the right (lmao)
+ - High frequency noise in the lateral force
+ - we got a lot of overheating in the tyres, huh i dont know how to fix that
+ - maybe implement The Magic Formula Tire Model
+ 
 ### Mathematical Modeling & Physics Formulation
 
 | Domain | Phenomenon | Formulation |

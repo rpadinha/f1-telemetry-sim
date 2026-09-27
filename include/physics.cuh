@@ -133,14 +133,37 @@ struct SimResult {
 
 // struct to export telemetry data from best setup
 struct TelemetryPoint {
-    float speed_kmh;                    // Speed in segment in km/h
-    float rpm;                          // RPM in segment
-    int gear;                           // Gear in segment
+    float speed_kmh;                    // Speed in segment (km/h)
+    float rpm;                          // RPM in segment (RPM)
+    int gear;                           // Gear in segment (int)
     float throttle;                     // throttle (%)
     float brake;                        // brake (%)
-    float time_s;                       // time s
-    float tyre_temp_front;              // average temp front
-    float tyre_temp_rear;               // average temp rear
+    float time_s;                       // time (s)
+    float tyre_temp_front;              // average temp front (Cº)
+    float tyre_temp_rear;               // average temp rear (Cº)
+
+    float tyre_temp_fl;
+    float tyre_temp_fr;
+    float tyre_temp_rl;
+    float tyre_temp_rr;
+
+    float total_mass;
+    float pitch_angle;
+    float drag_force;
+    float downforce;
+    float lateral_force;
+    float gravity_longitudinal;
+    float max_grip;
+    float long_grip;
+    float max_traction_force;
+    float engine_braking_force;
+    float desired_braking_force;
+    float desired_engine_force;
+    float applied_long_force;
+    float load_fl;
+    float load_fr;
+    float load_rl;
+    float load_rr;
 };
 
 // step physics for both visualizer and simulate lap cuda device code (CUDA_CALLABLE)

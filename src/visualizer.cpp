@@ -123,7 +123,7 @@ sf::Vector2f get_screen_coordinates(int current_seg, float current_m, const std:
 void reset_car_state(F1Car& car, const std::vector<TrackSegment>& track) {
     car.v = track[0].real_speed_kmh / 3.6f;
     car.battery_mj = Config::MAX_BATTERY_MJ;
-    car.fuel_kg = 10.0f;
+    car.fuel_kg = 6.0f;
     car.current_gear = track[0].real_gear;
     car.gear_shift_timer = 0.0f;
     car.rpm = track[0].real_rpm;

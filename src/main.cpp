@@ -87,16 +87,21 @@ int main(int argc, char* argv[]) {
     std::cout << "[CPU] ----- Max Velocity: " << results[0].top_speed_kmh << std::endl;
 
     export_simulated_telemetry(pole_position_setup, track.data(), track.size(), year, gp, session);
-
-    run_sfml_visualizer(track, pole_position_setup);
-
-    std::string plot_script_path = root + "/scripts/plot_comparisons.py";
-    std::string export_command = python_exe + " " + plot_script_path + " " + IMPORT_FILE + " " + EXPORT_FILE;
-
-
-    int export_result = std::system(export_command.c_str());
-    if (export_result != 0) {
+    std::string plot1_script_path = root + "/scripts/plot_comparisons.py";
+    std::string export1_command = python_exe + " " + plot1_script_path + " " + IMPORT_FILE + " " + EXPORT_FILE;
+    int export1_result = std::system(export1_command.c_str());
+    if (export1_result != 0) {
         std::cerr << "Error executing export python script.\n";
         return 1;
     }
+
+    std::string plot2_script_path = root + "/scripts/plot_dynamics.py";
+    std::string export2_command = python_exe + " " + plot2_script_path + " " + IMPORT_FILE + " " + EXPORT_FILE;
+    int export2_result = std::system(export2_command.c_str());
+    if (export2_result != 0) {
+        std::cerr << "Error executing export python script.\n";
+        return 1;
+    }
+    run_sfml_visualizer(track, pole_position_setup);
+
 }
