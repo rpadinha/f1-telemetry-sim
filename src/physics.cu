@@ -11,18 +11,17 @@
 
 __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
 
-    float speed = get_allowed_speed(car, setup, track, num_segments);
+    float target_speed = get_allowed_speed(car, setup, track, num_segments);
+    float speed_error = car->v - target_speed;
 
     // just brake or accelerate
     // coasting is still meh
-    if (car->v > speed + 1.0f) {
+    if (speed_error > 0.5f) {
         car->action = DriverAction::BRAKE;
-    } else if (car->action == DriverAction::ACCELERATE && car->v > speed - 4.0f) {
-        car->action = DriverAction::COAST;
-    } else if (car->action == DriverAction::BRAKE && car->v > speed - 2.0f) {
-        car->action = DriverAction::BRAKE;
-    } else {
+    } else if (speed_error < -1.5f) {
         car->action = DriverAction::ACCELERATE;
+    } else {
+        car->action = DriverAction::COAST;
     }
 
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
@@ -36,9 +35,9 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
 
     float net_force = compute_net_force(car, dynamics);
 
-    float a = net_force / dynamics.total_mass;  // nice using dynamics
-    car->a = a;                                 // accel
-    car->v += a * dt;                           // vel
+    float new_accel = net_force / dynamics.total_mass;  // nice using dynamics
+    car->a = new_accel;                                 // accel
+    car->v += new_accel * dt;                           // vel
     if (car->v < 0.0f) car->v = 0.0f;           // Prevent reverse tracking bugs
     car->current_m += car->v * dt;
     car->time_s += dt;
@@ -54,7 +53,10 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
 
     upshift_cut(car,dt);
     update_transmission(car);
-    update_tyres(car, dynamics, setup, dt);
+
+    F1CarDynamics post_step_dynamics = calculate_car_dynamics(car, setup, track, num_segments);
+
+    update_tyres(car, post_step_dynamics, setup, dt);
 }
 
 __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num_setups, const TrackSegment* track, int num_segments) {

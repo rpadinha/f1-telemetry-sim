@@ -5,9 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 def main():
-    print("Plotting comparisons of sim vs real (splitting into focused graphs)...")
+    print("[PYTHON] Plotting comparisons of sim vs real (splitting into focused graphs)...")
     if len(sys.argv) < 3:
-        print("Error: Missing file arguments. Usage: script.py <path_real> <path_sim>", file=sys.stderr)
+        print("[PYTHON] Error: Missing file arguments. Usage: script.py <path_real> <path_sim>", file=sys.stderr)
         sys.exit(1)
 
     path_real = sys.argv[1]
@@ -17,10 +17,12 @@ def main():
         print(f"[PYTHON] CSV files not found:\n -> {path_real}\n -> {path_sim}")
         sys.exit(1)
 
-    # --- GP name ---
+    # --- Year/GP/session name ---
     filename_clean = os.path.splitext(os.path.basename(path_real))[0]
     parts = filename_clean.split('_')
-    gp_name = parts[1].upper() if len(parts) > 1 else "F1"
+    year = parts[0] if len(parts) > 1 else "_"
+    gp_name = parts[1].lower() if len(parts) > 1 else "_"
+    session_type = parts[2].lower() if len(parts) > 1 else "_"
 
     df_real = pd.read_csv(path_real)
     df_sim = pd.read_csv(path_sim)
@@ -30,19 +32,19 @@ def main():
     df_sim = df_sim.iloc[:min_len].copy()
     distance = np.arange(min_len)
 
-    # Normalizar pedais se necessário
+    # pedals normalization if needed
     if df_real['Throttle'].max() > 1.5:
         df_real['Throttle'] = df_real['Throttle'] / 100.0
     if df_real['Brake'].max() > 1.5:
         df_real['Brake'] = df_real['Brake'] / 100.0
 
-    # Cálculo do Delta
+    # delta calculation
     v_real_ms = np.maximum(df_real['Real Speed'] / 3.6, 2.0)
     real_cum_time = np.cumsum(1.0 / v_real_ms)
     delta_time = df_sim['Sim_Time_s'] - real_cum_time
     final_delta = delta_time.iloc[-1]
 
-    # Configurações globais de estilo (Mantendo a tua identidade visual escura)
+    # Gloabl settings for plt
     plt.style.use('dark_background')
     bg_canvas = '#0e1015'
     bg_axes = '#14171f'
@@ -52,11 +54,15 @@ def main():
         ax.set_facecolor(bg_axes)
         ax.grid(True, color=grid_color, linestyle='--', linewidth=0.7, alpha=0.7)
 
-    # Descobre a pasta onde guardar os gráficos (mesma pasta do script ou subpasta data)
+    # makes the folder for year_gp_session and puts the comparisons there!
     output_dir = os.path.dirname(path_real) if os.path.dirname(path_real) else "../data"
+    output_dir += "/" + year + "_" + gp_name + "_" + session_type
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # =========================================================================
-    # GRÁFICO 1: PERFORMANCE & TIME DELTA (Speed + Delta)
+    # PLOT 1: PERFORMANCE & TIME DELTA (Speed + Delta)
     # =========================================================================
     fig1, axs1 = plt.subplots(2, 1, figsize=(16, 8), sharex=True, gridspec_kw={'height_ratios': [2.5, 1.2]})
     fig1.patch.set_facecolor(bg_canvas)
@@ -68,17 +74,17 @@ def main():
     axs1[0].set_ylabel("Speed\n(km/h)", color="white", fontsize=10)
     axs1[0].set_ylim(40, 365)
     axs1[0].legend(loc="lower left", facecolor="#1e222d", edgecolor="none")
-    axs1[0].set_title(f"{gp_name} PERFORMANCE ANALYSIS | Lap Time Delta: {final_delta:+.3f}s", color="white", fontsize=13, weight="bold")
+    axs1[0].set_title(f"{gp_name.capitalize()} PERFORMANCE ANALYSIS | Lap Time Delta: {final_delta:+.3f}s", color="white", fontsize=13, weight="bold")
 
     # why yhis
-    if gp_name == "MONZA":
+    if gp_name == "monza":
         corners = {900: "Variante Rettifilo", 1500: "Curva Grande", 2100: "Variante Roggia", 2500: "Lesmo 1", 2850: "Lesmo 2", 3900: "Variante Ascari", 5000: "Parabolica"}
         for dist, name in corners.items():
             if dist < min_len:
                 axs1[0].axvline(dist, color="#4f5666", linestyle=":", alpha=0.6)
                 axs1[0].text(dist + 20, 70, name, color="#8b949e", fontsize=8, rotation=90)
 
-    # Canal de Delta
+    # Delta plot
     axs1[1].plot(distance, delta_time, color="#ffffff", linewidth=1.5)
     axs1[1].axhline(0, color="#6e7681", linestyle="--", linewidth=0.8)
     axs1[1].fill_between(distance, delta_time, 0, where=(delta_time > 0), color="#ff3344", alpha=0.35, interpolate=True)
@@ -106,7 +112,7 @@ def main():
     axs2[0].set_yticks([-1, 0, 1])
     axs2[0].set_yticklabels(["1.0 (Brake)", "0", "1.0 (Gas)"])
     axs2[0].legend(loc="lower left", facecolor="#1e222d", edgecolor="none", ncol=4)
-    axs2[0].set_title(f"{gp_name} DRIVER INPUTS & TELEMETRY", color="white", fontsize=13, weight="bold")
+    axs2[0].set_title(f"{gp_name.capitalize()} DRIVER INPUTS & TELEMETRY", color="white", fontsize=13, weight="bold")
 
     # RPM and Gears
     ax_rpm = axs2[1]
@@ -142,16 +148,16 @@ def main():
     ax3.axhline(105.0, color="#ffffff", linestyle=":", alpha=0.4, label="Optimal Window (105°C)")
     ax3.set_ylabel("Tyre Temp (°C)", color="white", fontsize=10)
     ax3.set_xlabel("Track Distance (m)", color="white", fontsize=11)
-    ax3.set_title(f"{gp_name} TYRE THERMAL DYNAMICS", color="white", fontsize=13, weight="bold")
+    ax3.set_title(f"{gp_name.capitalize()} TYRE THERMAL DYNAMICS", color="white", fontsize=13, weight="bold")
     ax3.legend(loc="lower left", facecolor="#1e222d", edgecolor="none", ncol=3)
 
     plt.subplots_adjust(left=0.07, right=0.94, top=0.88, bottom=0.15)
     fig3.savefig(os.path.join(output_dir, f"{filename_clean}_thermals.png"), dpi=300, facecolor=fig3.get_facecolor())
 
     print(f"[PYTHON] 3 Graphs generated successfully in '{output_dir}/' folder:")
-    print(f" -> {filename_clean}_performance.png")
-    print(f" -> {filename_clean}_inputs.png")
-    print(f" -> {filename_clean}_thermals.png")
+    print(f"[PYTHON] -> {filename_clean}_performance.png")
+    print(f"[PYTHON] -> {filename_clean}_inputs.png")
+    print(f"[PYTHON] -> {filename_clean}_thermals.png")
     
 if __name__ == "__main__":
     main()

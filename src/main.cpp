@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
         setups[i].drag_coef = drag_dist(gen);
     }
 
-    std::cout << "[CUDA] Sending Data to GPU..." << std::endl;
+    std::cout << "[GPU] Sending Data to GPU..." << std::endl;
 
     run_simulation_batch(setups.data(), results.data(), track.data(), track.size(), Config::NUM_SETUPS);
 
@@ -79,12 +79,12 @@ int main(int argc, char* argv[]) {
 
     CarSetup pole_position_setup = setups[results[0].setup_id];
 
-    std::cout << " ----- Pole Position -----" << std::endl;
-    std::cout << " ----- Setup Id: " << results[0].setup_id << std::endl;
-    std::cout << pole_position_setup.ice_power_kw << "kw(ICE)|" << pole_position_setup.mguk_power_kw << "kw(MGU-K)|" << 
+    std::cout << "[CPU] ----- Pole Position -----" << std::endl;
+    std::cout << "[CPU] ----- Setup Id: " << results[0].setup_id << std::endl;
+    std::cout << "[CPU] " << pole_position_setup.ice_power_kw << "kw(ICE)|" << pole_position_setup.mguk_power_kw << "kw(MGU-K)|" << 
     pole_position_setup.drag_coef << "(DRAG)" << std::endl;
-    std::cout << " ----- Lap Time: " << results[0].lap_time << std::endl;
-    std::cout << " ----- Max Velocity: " << results[0].top_speed_kmh << std::endl;
+    std::cout << "[CPU] ----- Lap Time: " << results[0].lap_time << std::endl;
+    std::cout << "[CPU] ----- Max Velocity: " << results[0].top_speed_kmh << std::endl;
 
     export_simulated_telemetry(pole_position_setup, track.data(), track.size(), year, gp, session);
 

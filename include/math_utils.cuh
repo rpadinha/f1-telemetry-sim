@@ -7,10 +7,7 @@
 #include "tyres.cuh"
 
 __host__ __device__ inline bool is_straight(float radius_m, const CarSetup* setup) {
-    /*
-    previously there was a bigger determination to see if it was a corner here
-    */
-    return radius_m >= 800.f;               // any corner radius above 800m is effectively a straight
+    return radius_m >= 1000.f;
 }
 
 __host__ __device__ inline float get_track_pitch_angle(const TrackSegment* track, int current_seg, int num_segments) {
@@ -129,7 +126,7 @@ __host__ __device__ inline float compute_net_force(const F1Car* car, const F1Car
         }
         case DriverAction::ACCELERATE: {
             float applied_engine_force = car->throttle_pedal * dynamics.desired_engine_force;
-            
+
             net_force = applied_engine_force - dynamics.drag_force + dynamics.gravity_longitudinal;
             break;
         }

@@ -7,17 +7,17 @@ from scipy.interpolate import pchip_interpolate
 
 
 def main():
-    print("Initializing FastF1...")
+    print("[PYTHON] Initializing FastF1...")
 
     if len(sys.argv) < 4:
-       print("Error: Not enough args in python? how?", file=sys.stderr)
+       print("[PYTHON] Error: Not enough args in python? how?", file=sys.stderr)
        sys.exit(1)
 
 
     year = int(sys.argv[1])
     gp = sys.argv[2]
     session_type = sys.argv[3]
-    print(f"Getting {year} {gp} {session_type}")
+    print(f"[PYTHON] Getting {year} {gp} {session_type}")
 
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +33,7 @@ def main():
     lap = session.laps.pick_fastest()
     tel = lap.get_telemetry()
     print(
-        f"Telemetry loaded. {lap['Driver']} set the fastest lap: {lap['LapTime']}."
+        f"[PYTHON] Telemetry loaded. {lap['Driver']} set the fastest lap: {lap['LapTime']}."
     )
 
     # Interpolating telemetry data to have a uniform distance step (1 meter) for better curvature calculation
@@ -84,8 +84,9 @@ def main():
     x_rot = df["X"] * cos_theta - df["Y"] * sin_theta
     y_rot = df["X"] * sin_theta + df["Y"] * cos_theta
 
-    df["X"] = x_rot
-    df["Y"] = y_rot
+    window_size = 10
+    df["X"] = pd.Series(x_rot).rolling(window=window_size, min_periods=1, center=True).mean().to_numpy()
+    df["Y"] = pd.Series(y_rot).rolling(window=window_size, min_periods=1, center=True).mean().to_numpy()
 
     # Curvature radius calculation
     dx = np.gradient(df["X"])
@@ -93,16 +94,15 @@ def main():
     ddx = np.gradient(dx)
     ddy = np.gradient(dy)
 
+    numerator = np.abs(dx * ddy - dy * ddx)
     denominator = (dx**2 + dy**2) ** 1.5 + 1e-8
-    curvature = np.abs(dx * ddy - dy * ddx) / denominator
+
+    curvature = numerator / denominator
 
     # Defines the maximum radius for curves
-    df["Radius"] = np.where(curvature > 1e-3, 1 / curvature, 10000)
+    df["Radius"] = np.where(curvature > 1e-4, 1 / curvature, 10000)
 
-    # Smoothing
-    df["Radius"] = (
-        df["Radius"].rolling(window=5, min_periods=1, center=True).mean()
-    )
+    df["Radius"] = df["Radius"].clip(upper=10000)
 
     # Segment length now will be always 1 meter
     df["Segment_Length"] = df["Distance"].diff().fillna(df["Distance"].iloc[0])
@@ -115,7 +115,7 @@ def main():
 
     df[["Segment_Length", "Radius", "X", "Y", "Z", "DRS", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
 
-    print(f"Success! Exported {len(df)} segments to {output_path}")
+    print(f"[PYTHON] Success! Exported {len(df)} segments to {output_path}")
 
 if __name__ == "__main__":
     main()

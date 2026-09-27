@@ -34,8 +34,11 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
     float current_mu = apply_load_sensitivity(base_mu, current_normal, nominal_load);
     float speed = sqrtf((current_mu * current_normal * track[car->current_seg].radius_m) / setup->mass_kg);
 
+    // DYNAMIC LOOKAHEAD HORIZON: Scale distance based on kinetic energy state
+    // At 340 km/h (94 m/s), this expands your horizon safely up to ~450-500 meters
+    float dynamic_lookahead = Config::LOOKAHEAD_METERS + (car->v * 1.5f);
     float dist_to_curve = track[car->current_seg].length_m - car->current_m;
-    for (int i = 1; dist_to_curve < Config::LOOKAHEAD_METERS; ++i) {
+    for (int i = 1; dist_to_curve < dynamic_lookahead; ++i) {
         int lookahead = (car->current_seg + i) % num_segments;
         
         if (!is_straight(track[lookahead].radius_m, setup)) {
@@ -56,11 +59,12 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
 
             // Balanced Deceleration & Braking Profile
             // Using car->v keeps the deceleration profile tied to physical state, not lookahead iteration
+            // fixed: evaluate deceleration based on the profileof the target segment's pitch angle
             float avg_speed_during_braking = (car->v + corner_v) * 0.5f;
-            float effective_decel = get_max_deceleration(avg_speed_during_braking, current_pitch, setup, base_mu);
+            float effective_decel = get_max_deceleration(avg_speed_during_braking, future_pitch, setup, base_mu);
             
             // Tuned safety margin (0.88f = 12% margin) to bridge early/late discrepancies
-            effective_decel *= 0.88f; 
+            effective_decel *= 0.90f; 
             if (effective_decel < 1.0f) effective_decel = 1.0f;
 
             // Torricelli Threat Evaluation
