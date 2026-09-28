@@ -131,7 +131,6 @@ def main():
 
     plt.savefig(os.path.join(output_dir, f"{filename_clean}_dynamics.png"), dpi=300, facecolor=fig.get_facecolor())
     print(f"[PYTHON] Dynamics plot saved to: {os.path.join(output_dir, f"{filename_clean}_dynamics.png")}")
-    plt.show()
 
 if __name__ == "__main__":
     main()

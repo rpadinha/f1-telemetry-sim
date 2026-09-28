@@ -32,14 +32,14 @@ namespace Config {
     // gear ratios for each of the gear
     CUDA_CALLABLE inline float get_gear_ratio(int gear) {
         // added static because static const forces the compiler to bake this directly into registers or uniform memory
-        static const float ratios[8] = {3.2f, 2.6f, 2.1f, 1.7f, 1.4f, 1.2f, 1.0f, 0.9f};
+        static const float ratios[8] = {3.2f, 2.6f, 2.1f, 1.7f, 1.4f, 1.2f, 1.0f, 0.7f};
         if (gear < 1) gear = 1;
         if (gear > 8) gear = 8;
         return ratios[gear - 1];
     }
     constexpr float RPM_REDLINE = 12800.0f;             // Redline RPM of the car // wowzers
-    constexpr float RPM_UPSHIFT = 11800.0f;             // Ideal upshift RPM of the car
-    constexpr float RPM_DOWNSHIFT = 7500.0f;            // Ideal downshift RPM of the car
+    constexpr float RPM_UPSHIFT = 11500.0f;             // Ideal upshift RPM of the car
+    constexpr float RPM_DOWNSHIFT = 7000.0f;            // Ideal downshift RPM of the car
     constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power
     constexpr float RPM_IDLE = 5000.f;                  // RPM idle
     constexpr float MAX_ENGINE_BRAKING = 1500.0f;       // Engine braking max force
@@ -73,7 +73,7 @@ namespace Config {
     constexpr float MGUK_REGEN_KW = 350.0f;             // Maximum regenerative power of the MGU-K (kW)
 
     // Simulation Parameters
-    constexpr int LOOKAHEAD_METERS = 300;               // Lookahead distance (m)
+    constexpr int LOOKAHEAD_METERS = 100;               // Lookahead distance (m)
     constexpr float PHYSICS_DT = 0.002f;                // Physics timestep (s)
     constexpr int NUM_SETUPS = 100;                    // Number of setups to simulate
 }

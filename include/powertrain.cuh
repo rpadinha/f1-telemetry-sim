@@ -15,8 +15,9 @@ __host__ __device__ void update_transmission(F1Car* car) {
     } else if (car->current_gear > 1) {
         float dynamic_downshift_rpm = Config::RPM_DOWNSHIFT;
 
-        if (car->action == DriverAction::BRAKE && car->brake_pedal > 0.5f) { dynamic_downshift_rpm = 10500.0f; }
-        else if (car->action == DriverAction::COAST) { dynamic_downshift_rpm = 9000.0f; }
+        if (car->action == DriverAction::BRAKE && car->brake_pedal > 0.6f) { dynamic_downshift_rpm = 6000.0f; }
+
+        else if (car->action == DriverAction::COAST) { dynamic_downshift_rpm = 7000.0f; }
 
         if (car->rpm < dynamic_downshift_rpm) {
             car->current_gear--;

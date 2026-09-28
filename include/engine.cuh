@@ -33,10 +33,10 @@ __host__ __device__ inline float compute_drive_force(const F1Car* car, const Car
 
 // Dynamic Fuel Burn
 // FIA maximum mass fuel flow limit: 100 kg/h (~0.02778 kg/s) at 100% throttle
+// defined in the config.cuh
 __host__ __device__ inline void burn_fuel(F1Car* car, float throttle_pedal, float dt) {
     if (car->fuel_kg > 0.0f && throttle_pedal > 0.0f) {
-        constexpr float FUEL_FLOW_KG_S = 100.0f / 3600.0f;  // max fuel flow in kg/s -> 100 kg/h (~0.02778 kg/s) at 100% throttle
-        car->fuel_kg -= (throttle_pedal * FUEL_FLOW_KG_S) * dt;
+        car->fuel_kg -= (throttle_pedal * Config::FUEL_FLOW_KG_S) * dt;
         if (car->fuel_kg < 0.0f) {
             car->fuel_kg = 0.0f;
         }

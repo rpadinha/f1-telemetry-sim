@@ -71,8 +71,8 @@ int main(int argc, char* argv[]) {
 
     run_simulation_batch(setups.data(), results.data(), track.data(), track.size(), Config::NUM_SETUPS);
 
-    std::cout << "[CPU] Success here are the results: \n\n";
-
+    std::cout << "[CPU] Success here are the results: " << std::endl;
+    
     std::sort(results.begin(), results.end(), [](const SimResult& a, const SimResult& b) {
         return a.lap_time < b.lap_time;
     });
@@ -86,7 +86,10 @@ int main(int argc, char* argv[]) {
     std::cout << "[CPU] ----- Lap Time: " << results[0].lap_time << std::endl;
     std::cout << "[CPU] ----- Max Velocity: " << results[0].top_speed_kmh << std::endl;
 
+    // export telemetry to csv
     export_simulated_telemetry(pole_position_setup, track.data(), track.size(), year, gp, session);
+
+    // python script for comparisons vs real data
     std::string plot1_script_path = root + "/scripts/plot_comparisons.py";
     std::string export1_command = python_exe + " " + plot1_script_path + " " + IMPORT_FILE + " " + EXPORT_FILE;
     int export1_result = std::system(export1_command.c_str());
@@ -95,6 +98,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // plot for dynamics for validation of calculations
     std::string plot2_script_path = root + "/scripts/plot_dynamics.py";
     std::string export2_command = python_exe + " " + plot2_script_path + " " + IMPORT_FILE + " " + EXPORT_FILE;
     int export2_result = std::system(export2_command.c_str());
@@ -102,6 +106,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error executing export python script.\n";
         return 1;
     }
+
+    // sfml visualizer
     run_sfml_visualizer(track, pole_position_setup);
 
 }

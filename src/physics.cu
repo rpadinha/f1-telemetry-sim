@@ -27,6 +27,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
     // creating a new car dynamics everytime is weird
+    // fix this aswell
     F1CarDynamics dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
     update_driver_pedals(car, dynamics, setup, track, num_segments, dt);
@@ -54,6 +55,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     upshift_cut(car,dt);
     update_transmission(car);
 
+    // todo: fix this
     F1CarDynamics post_step_dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
     update_tyres(car, post_step_dynamics, setup, dt);
@@ -243,6 +245,7 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
         return;
     }
 
+    // ai is a massive saviour holy
     file << "Distance_m,Sim_Speed,Sim_RPM,Sim_Gear,Sim_Throttle,Sim_Brake,Sim_Time_s,"
          << "Tyre_Temp_Front_C,Tyre_Temp_Rear_C,Tyre_Temp_FL_C,Tyre_Temp_FR_C,Tyre_Temp_RL_C,Tyre_Temp_RR_C,"
          << "Total_Mass_kg,Pitch_Angle_rad,Drag_Force_N,Downforce_N,Lateral_Force_N,Gravity_Long_N,"

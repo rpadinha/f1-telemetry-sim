@@ -1,6 +1,8 @@
 #include "sim_driver.cuh"
 #include <math.h>
 
+
+// get max deceleration according to the average speed during braking also taking into account the pitch_angle
 __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu) {
     // first we calculate the aerodynamics at current speed v_ms
     float drag = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * setup->drag_coef * Config::FRONTAL_AREA;
@@ -28,15 +30,15 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
     float cl_a = (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
     float nominal_load = (setup->mass_kg + car->fuel_kg) * Config::GRAVITY;
-    float current_normal = (setup->mass_kg * Config::GRAVITY * cosf(current_pitch)) + downforce;
+    float current_normal = ((setup->mass_kg + car->fuel_kg) * Config::GRAVITY * cosf(current_pitch)) + downforce;
     if (current_normal < 0.0f) current_normal = 0.0f;
 
     float current_mu = apply_load_sensitivity(base_mu, current_normal, nominal_load);
     float speed = sqrtf((current_mu * current_normal * track[car->current_seg].radius_m) / setup->mass_kg);
 
     // DYNAMIC LOOKAHEAD HORIZON: Scale distance based on kinetic energy state
-    // At 340 km/h (94 m/s), this expands your horizon safely up to ~450-500 meters
-    float dynamic_lookahead = Config::LOOKAHEAD_METERS + (car->v * 1.5f);
+    // At 340 km/h (94 m/s), this expands your horizon safely from 100m to 200-250m
+    float dynamic_lookahead = Config::LOOKAHEAD_METERS + (car->v * 2.0f);
     float dist_to_curve = track[car->current_seg].length_m - car->current_m;
     for (int i = 1; dist_to_curve < dynamic_lookahead; ++i) {
         int lookahead = (car->current_seg + i) % num_segments;
@@ -59,11 +61,11 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
 
             // Balanced Deceleration & Braking Profile
             // Using car->v keeps the deceleration profile tied to physical state, not lookahead iteration
-            // fixed: evaluate deceleration based on the profileof the target segment's pitch angle
+            // fixed: evaluate deceleration based on the profile of the target segment's pitch angle
             float avg_speed_during_braking = (car->v + corner_v) * 0.5f;
             float effective_decel = get_max_deceleration(avg_speed_during_braking, future_pitch, setup, base_mu);
             
-            // Tuned safety margin (0.88f = 12% margin) to bridge early/late discrepancies
+            // Tuned safety margin (0.90f = 10% margin) to bridge early/late discrepancies
             effective_decel *= 0.90f; 
             if (effective_decel < 1.0f) effective_decel = 1.0f;
 
