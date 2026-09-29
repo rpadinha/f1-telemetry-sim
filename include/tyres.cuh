@@ -29,8 +29,9 @@ __host__ __device__ inline float calculate_effective_grip(const F1Car* car) {
 }
 
 // thermal balance & wear integration per timestep
-__host__ __device__ inline void update_tyres(F1Car* car, const F1CarDynamics& dynamics, const CarSetup* setup, float dt) {
+__host__ __device__ inline void update_tyres(F1Car* car, float dt) {
     TyreProperties properties = Config::get_tyre_properties(car->current_compound);
+    const F1CarDynamics& dynamics = car->dynamics;
 
     // total load 
     float total_load = dynamics.load_fl + dynamics.load_fr + dynamics.load_rl + dynamics.load_rr;
@@ -49,7 +50,7 @@ __host__ __device__ inline void update_tyres(F1Car* car, const F1CarDynamics& dy
         (car->a > 0.0f) ? 0.60f : 0.40f  // RR
     };
 
-    float air_cooling_factor = 0.014f * sqrt(car->v + 1.0f);
+    float air_cooling_factor = 0.008f * sqrt(car->v + 1.0f);
     
     for (int i = 0 ; i < 4 ; i++) {
         // The force this tyre suffers is based on the weight percentage
@@ -62,7 +63,7 @@ __host__ __device__ inline void update_tyres(F1Car* car, const F1CarDynamics& dy
         float f_tangential = sqrtf(f_lat_i * f_lat_i + f_long_i * f_long_i);
 
         // Q_in = F_tangential * v * k_friction
-        float heat = f_tangential * car->v * 0.0001f;
+        float heat = f_tangential * car->v * 0.00008f;
         float cool = air_cooling_factor * (*temps[i] - Config::AMBIENT_TEMP_C);
 
         *temps[i] += (heat - cool) * dt;
@@ -78,8 +79,9 @@ __host__ __device__ inline void update_tyres(F1Car* car, const F1CarDynamics& dy
 
 // Load Degressivity (instead of grip growing perfectly linear with vertical load)
 __host__ __device__ inline float apply_load_sensitivity(float base_mu, float normal_force, float nominal_load) {
-    constexpr float LOAD_SENSITIVITY = 0.000028f;
+    constexpr float LOAD_SENSITIVITY = 0.000012f;
     float delta_load = normal_force - nominal_load;
+    if (delta_load < 0.0f) delta_load = 0.0f;
     return base_mu / (1.0f + LOAD_SENSITIVITY * delta_load);
 }
 

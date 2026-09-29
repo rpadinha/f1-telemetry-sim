@@ -19,6 +19,6 @@ __host__ __device__ float calculate_mguk_deployment(const F1Car* car, const CarS
 __host__ __device__ void update_ers(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt);
 
 // updating driver pedals
-__host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt);
+__host__ __device__ void update_driver_pedals(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt);
 
 #endif

@@ -4,6 +4,7 @@
 #include <math.h>
 #include "config.cuh"
 #include "physics.cuh"
+#include "engine.cuh"
 #include "tyres.cuh"
 
 __host__ __device__ inline bool is_straight(float radius_m, const CarSetup* setup) {
@@ -35,28 +36,25 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     dynamics.pitch_angle = get_track_pitch_angle(track, car->current_seg, num_segments);
 
     // Dynamic drag reduction when rear wing slot gap is open
-    // F_drag = 0.5 * rho * v^2 * Cd * A
     float current_drag_coef = setup->drag_coef;
     if (car->drs_open) { current_drag_coef *= 0.65f; }
     dynamics.drag_force = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * current_drag_coef * Config::FRONTAL_AREA;
     
     // F_downforce = 0.5 * rho * v^2 * Cl * A (where Cl * A ~= 3.0 * Cd * A)
     float cl_a = (setup->drag_coef * 3.0f) * Config::FRONTAL_AREA;
-    float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
+    dynamics.downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
 
     // Base static gravity load perpendicular to the road: F_normal,static = m * g * cos(theta)
     float static_normal = dynamics.total_mass * Config::GRAVITY * cosf(dynamics.pitch_angle);
-    float normal_force = static_normal + downforce;
-    if (normal_force < 0.0f) normal_force = 0.0f;
+    dynamics.normal_force = static_normal + dynamics.downforce;
+    if (dynamics.normal_force < 0.0f) dynamics.normal_force = 0.0f;
 
     // Longitudinal Weight Transfer: Delta_Fz = (m * a * h_cg) / L
-    // car->a > 0 (acceleration) shifts weight to rear tires (+Delta_Fz)
-    // car->a < 0 (braking) shifts weight to front tires (-Delta_Fz)
     float weight_transfer_long = (dynamics.total_mass * car->a * Config::GRAVITY_CENTER_HEIGHT) / Config::WHEEL_BASE;
 
     // F1 static distribution (~45% front / ~55% rear) + aero balance (~40% front / ~60% rear)
-    float front_force = (0.45f * static_normal) + (0.40f * downforce) - weight_transfer_long;
-    float rear_force  = (0.55f * static_normal) + (0.60f * downforce) + weight_transfer_long;
+    float front_force = (0.45f * static_normal) + (0.40f * dynamics.downforce) - weight_transfer_long;
+    float rear_force  = (0.55f * static_normal) + (0.60f * dynamics.downforce) + weight_transfer_long;
     if (front_force < 0.0f) front_force = 0.0f;
     if (rear_force < 0.0f) rear_force = 0.0f;
 
@@ -74,18 +72,17 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     dynamics.load_rl = (rear_force * 0.5f)  + (weight_transfer_lat * lat_dir);
     dynamics.load_rr = (rear_force * 0.5f)  - (weight_transfer_lat * lat_dir);
 
-    // protection for wheel going flying ( wheel in the air = 0N)
     if (dynamics.load_fl < 0.0f) dynamics.load_fl = 0.0f;
     if (dynamics.load_fr < 0.0f) dynamics.load_fr = 0.0f;
     if (dynamics.load_rl < 0.0f) dynamics.load_rl = 0.0f;
     if (dynamics.load_rr < 0.0f) dynamics.load_rr = 0.0f;
 
-    // Maximum friction circle radius: F_grip,max = F_normal * the grip of the car according to tyres grip
+    // Maximum friction circle radius: F_grip,max = F_normal * effective_mu
     float nominal_load = dynamics.total_mass * Config::GRAVITY;
     float effective_mu = calculate_effective_grip(car);
-    effective_mu = apply_load_sensitivity(effective_mu, normal_force, nominal_load);
+    effective_mu = apply_load_sensitivity(effective_mu, dynamics.normal_force, nominal_load);
 
-    dynamics.max_grip = normal_force * effective_mu;
+    dynamics.max_grip = dynamics.normal_force * effective_mu;
 
     // Kamm Circle: F_long,grip = sqrt(F_grip,max^2 - F_lat^2)
     if (dynamics.max_grip > dynamics.lateral_force) {
@@ -95,7 +92,7 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     }
 
     // Dynamic rear load ratio replacing static 0.55 constant
-    float rear_grip_ratio = (normal_force > 0.0f) ? (rear_force / normal_force) : 0.55f;
+    float rear_grip_ratio = (dynamics.normal_force > 0.0f) ? (rear_force / dynamics.normal_force) : 0.55f;
     if (rear_grip_ratio > 0.85f) rear_grip_ratio = 0.85f;
     if (rear_grip_ratio < 0.15f) rear_grip_ratio = 0.15f;
 
@@ -104,28 +101,35 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
 
     // Longitudinal gravity: F_gravity,long = -m * g * sin(theta)
     dynamics.gravity_longitudinal = -dynamics.total_mass * Config::GRAVITY * sinf(dynamics.pitch_angle);
-    dynamics.engine_braking_force = (car->rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
+
+    // Initialize action-dependent forces to zero before driver step
+    dynamics.applied_long_force = 0.0f;
 
     return dynamics;
 }
 
-__host__ __device__ inline float compute_net_force(const F1Car* car, const F1CarDynamics& dynamics) {
+__host__ __device__ inline float compute_net_force(const F1Car* car) {
+    const F1CarDynamics& dynamics = car->dynamics;
     float net_force = 0.0f;
+    float engine_braking = get_engine_braking_force(car->rpm);
 
     switch (car->action) {
         case DriverAction::BRAKE: {
-            float requested_brake = car->brake_pedal * Config::MAX_BRAKE_SYSTEM_FORCE; // 45000N max limit on brakes
+            float requested_brake = car->brake_pedal * Config::MAX_BRAKE_SYSTEM_FORCE;
             float applied_brake_force = (requested_brake > dynamics.long_grip) ? dynamics.long_grip : requested_brake;
 
-            net_force = -applied_brake_force - dynamics.drag_force - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
+            net_force = -applied_brake_force - dynamics.drag_force - engine_braking + dynamics.gravity_longitudinal;
             break;
         }
         case DriverAction::COAST: {
-            net_force = -dynamics.drag_force - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
+            net_force = -dynamics.drag_force - engine_braking + dynamics.gravity_longitudinal;
             break;
         }
         case DriverAction::ACCELERATE: {
-            float applied_engine_force = car->throttle_pedal * dynamics.desired_engine_force;
+            float requested_engine = car->throttle_pedal * dynamics.desired_engine_force;
+            float applied_engine_force = (requested_engine > dynamics.max_traction_force) 
+                                       ? dynamics.max_traction_force 
+                                       : requested_engine;
 
             net_force = applied_engine_force - dynamics.drag_force + dynamics.gravity_longitudinal;
             break;

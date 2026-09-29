@@ -14,32 +14,33 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     float target_speed = get_allowed_speed(car, setup, track, num_segments);
     float speed_error = car->v - target_speed;
 
-    // just brake or accelerate
-    // coasting is still meh
-    if (speed_error > 0.5f) {
+    if (speed_error > 0.3f) {
         car->action = DriverAction::BRAKE;
-    } else if (speed_error < -1.5f) {
-        car->action = DriverAction::ACCELERATE;
-    } else {
+    } else if (car->action == DriverAction::BRAKE && speed_error > -2.0f) {
         car->action = DriverAction::COAST;
+    } else {
+        car->action = DriverAction::ACCELERATE;
     }
 
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
-    // creating a new car dynamics everytime is weird
-    // fix this aswell
-    F1CarDynamics dynamics = calculate_car_dynamics(car, setup, track, num_segments);
+    // 1. Compute base vehicle dynamics once per dt and store in car->dynamics
+    car->dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
-    update_driver_pedals(car, dynamics, setup, track, num_segments, dt);
+    // 2. Driver & Power Unit updates (populates car->dynamics.desired_engine_force)
+    update_driver_pedals(car, setup, track, num_segments, dt);
     update_ers(car, setup, track, num_segments, dt);
     burn_fuel(car, car->throttle_pedal, dt);
 
-    float net_force = compute_net_force(car, dynamics);
+    // 3. Net longitudinal force calculation
+    float net_force = compute_net_force(car);
+    car->dynamics.applied_long_force = net_force;
 
-    float new_accel = net_force / dynamics.total_mass;  // nice using dynamics
-    car->a = new_accel;                                 // accel
-    car->v += new_accel * dt;                           // vel
-    if (car->v < 0.0f) car->v = 0.0f;           // Prevent reverse tracking bugs
+    // 4. Kinematic integration
+    float new_accel = net_force / car->dynamics.total_mass;
+    car->a = new_accel;
+    car->v += new_accel * dt;
+    if (car->v < 0.0f) car->v = 0.0f;
     car->current_m += car->v * dt;
     car->time_s += dt;
 
@@ -52,13 +53,10 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
         }
     }
 
-    upshift_cut(car,dt);
+    // 5. Transmission & Tyre updates
+    upshift_cut(car, dt);
     update_transmission(car);
-
-    // todo: fix this
-    F1CarDynamics post_step_dynamics = calculate_car_dynamics(car, setup, track, num_segments);
-
-    update_tyres(car, post_step_dynamics, setup, dt);
+    update_tyres(car, dt);
 }
 
 __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num_setups, const TrackSegment* track, int num_segments) {
@@ -73,14 +71,13 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.a = 0.0f;
         car.battery_mj = 4.0f;
         car.fuel_kg = 6.0f;
-        car.rpm = track[0].real_rpm;
         car.current_gear = track[0].real_gear;
         car.gear_shift_timer = 0.0f;
         car.current_compound = TyreCompound::C3;
-        car.tyre_temp_fl = 85.0f;
-        car.tyre_temp_fr = 85.0f;
-        car.tyre_temp_rl = 85.0f;
-        car.tyre_temp_rr = 85.0f;
+        car.tyre_temp_fl = 95.0f;
+        car.tyre_temp_fr = 95.0f;
+        car.tyre_temp_rl = 95.0f;
+        car.tyre_temp_rr = 95.0f;
         car.tyre_wear_fl = 0.0f;
         car.tyre_wear_fr = 0.0f;
         car.tyre_wear_rl = 0.0f;
@@ -121,10 +118,10 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
     car.current_gear = track[0].real_gear;
     car.gear_shift_timer = 0.0f;
     car.current_compound = TyreCompound::C3;
-    car.tyre_temp_fl = 85.0f;
-    car.tyre_temp_fr = 85.0f;
-    car.tyre_temp_rl = 85.0f;
-    car.tyre_temp_rr = 85.0f;
+    car.tyre_temp_fl = 95.0f;
+    car.tyre_temp_fr = 95.0f;
+    car.tyre_temp_rl = 95.0f;
+    car.tyre_temp_rr = 95.0f;
     car.tyre_wear_fl = 0.0f;
     car.tyre_wear_fr = 0.0f;
     car.tyre_wear_rl = 0.0f;
@@ -141,47 +138,49 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
     int last_recorded_seg = -1;
 
     while (car.laps_completed < 1 && car.time_s < 300.0f) {
-        F1CarDynamics dynamics = calculate_car_dynamics(&car, &setup, track, num_segments);
-        
-        if (car.current_seg != last_recorded_seg && car.current_seg < num_segments) {
-            out_telemetry[car.current_seg].speed_kmh = car.v * 3.6f;
-            out_telemetry[car.current_seg].rpm = car.rpm;
-            out_telemetry[car.current_seg].gear = car.current_gear;
-            out_telemetry[car.current_seg].throttle = car.throttle_pedal;
-            out_telemetry[car.current_seg].brake = car.brake_pedal;
-            out_telemetry[car.current_seg].time_s = car.time_s;
-            out_telemetry[car.current_seg].tyre_temp_front = (car.tyre_temp_fl + car.tyre_temp_fr) / 2.f;
-            out_telemetry[car.current_seg].tyre_temp_rear = (car.tyre_temp_rl + car.tyre_temp_rr) / 2.f;
+        int seg_before_step = car.current_seg;
 
-            out_telemetry[car.current_seg].tyre_temp_fl = car.tyre_temp_fl;
-            out_telemetry[car.current_seg].tyre_temp_fr = car.tyre_temp_fr;
-            out_telemetry[car.current_seg].tyre_temp_rl = car.tyre_temp_rl;
-            out_telemetry[car.current_seg].tyre_temp_rr = car.tyre_temp_rr;
-
-            float total_normal = dynamics.load_fl + dynamics.load_fr + dynamics.load_rl + dynamics.load_rr;
-            float static_normal = dynamics.total_mass * Config::GRAVITY * cosf(dynamics.pitch_angle);
-
-            out_telemetry[car.current_seg].total_mass            = dynamics.total_mass;
-            out_telemetry[car.current_seg].pitch_angle           = dynamics.pitch_angle;
-            out_telemetry[car.current_seg].drag_force            = dynamics.drag_force;
-            out_telemetry[car.current_seg].downforce             = total_normal - static_normal;
-            out_telemetry[car.current_seg].lateral_force         = dynamics.lateral_force;
-            out_telemetry[car.current_seg].gravity_longitudinal  = dynamics.gravity_longitudinal;
-            out_telemetry[car.current_seg].max_grip              = dynamics.max_grip;
-            out_telemetry[car.current_seg].long_grip             = dynamics.long_grip;
-            out_telemetry[car.current_seg].max_traction_force    = dynamics.max_traction_force;
-            out_telemetry[car.current_seg].engine_braking_force  = dynamics.engine_braking_force;
-            out_telemetry[car.current_seg].desired_braking_force = dynamics.desired_braking_force;
-            out_telemetry[car.current_seg].desired_engine_force  = dynamics.desired_engine_force;
-            out_telemetry[car.current_seg].applied_long_force    = dynamics.applied_long_force;
-            out_telemetry[car.current_seg].load_fl               = dynamics.load_fl;
-            out_telemetry[car.current_seg].load_fr               = dynamics.load_fr;
-            out_telemetry[car.current_seg].load_rl               = dynamics.load_rl;
-            out_telemetry[car.current_seg].load_rr               = dynamics.load_rr;
-
-            last_recorded_seg = car.current_seg;
-        }
+        // Advance physics first so car.dynamics has all complete forces for this step
         step_physics(&car, &setup, track, num_segments, dt);
+
+        if (seg_before_step != last_recorded_seg && seg_before_step < num_segments) {
+            TelemetryPoint& pt = out_telemetry[seg_before_step];
+            const F1CarDynamics& dyn = car.dynamics;
+
+            pt.speed_kmh = car.v * 3.6f;
+            pt.rpm = car.rpm;
+            pt.gear = car.current_gear;
+            pt.throttle = car.throttle_pedal;
+            pt.brake = car.brake_pedal;
+            pt.time_s = car.time_s;
+            pt.tyre_temp_front = (car.tyre_temp_fl + car.tyre_temp_fr) * 0.5f;
+            pt.tyre_temp_rear  = (car.tyre_temp_rl + car.tyre_temp_rr) * 0.5f;
+
+            pt.tyre_temp_fl = car.tyre_temp_fl;
+            pt.tyre_temp_fr = car.tyre_temp_fr;
+            pt.tyre_temp_rl = car.tyre_temp_rl;
+            pt.tyre_temp_rr = car.tyre_temp_rr;
+
+            pt.total_mass           = dyn.total_mass;
+            pt.pitch_angle          = dyn.pitch_angle;
+            pt.drag_force           = dyn.drag_force;
+            pt.downforce            = dyn.downforce;
+            pt.normal_force         = dyn.normal_force;
+            pt.lateral_force        = dyn.lateral_force;
+            pt.gravity_longitudinal = dyn.gravity_longitudinal;
+            pt.max_grip             = dyn.max_grip;
+            pt.long_grip            = dyn.long_grip;
+            pt.max_traction_force   = dyn.max_traction_force;
+            pt.engine_braking_force = get_engine_braking_force(car.rpm);
+            pt.desired_engine_force = dyn.desired_engine_force;
+            pt.applied_long_force   = dyn.applied_long_force;
+            pt.load_fl              = dyn.load_fl;
+            pt.load_fr              = dyn.load_fr;
+            pt.load_rl              = dyn.load_rl;
+            pt.load_rr              = dyn.load_rr;
+
+            last_recorded_seg = seg_before_step;
+        }
     }
 }
 
@@ -222,11 +221,9 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
     size_t track_size = num_segments * sizeof(TrackSegment);
     size_t telemetry_size = num_segments * sizeof(TelemetryPoint);
 
-    // Aloca pista e buffer de telemetria na GPU
     cudaMalloc(&d_track, track_size);
     cudaMalloc(&d_telemetry, telemetry_size);
 
-    // Copia a pista da RAM (CPU) para a VRAM (GPU)
     cudaMemcpy(d_track, h_track, track_size, cudaMemcpyHostToDevice);
 
     record_pole_telemetry<<<1, 1>>>(best_setup, d_track, num_segments, d_telemetry);
@@ -238,18 +235,17 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
     std::string export_path = "../data/" + year + "_" + gp + "_" + session + "_sim.csv";
     std::ofstream file(export_path);
     if (!file.is_open()) {
-        std::cerr << "[CSV] Error opening" + export_path + "!\n";
+        std::cerr << "[CSV] Error opening " + export_path + "!\n";
         delete[] h_telemetry;
         cudaFree(d_track);
         cudaFree(d_telemetry);
         return;
     }
 
-    // ai is a massive saviour holy
     file << "Distance_m,Sim_Speed,Sim_RPM,Sim_Gear,Sim_Throttle,Sim_Brake,Sim_Time_s,"
          << "Tyre_Temp_Front_C,Tyre_Temp_Rear_C,Tyre_Temp_FL_C,Tyre_Temp_FR_C,Tyre_Temp_RL_C,Tyre_Temp_RR_C,"
-         << "Total_Mass_kg,Pitch_Angle_rad,Drag_Force_N,Downforce_N,Lateral_Force_N,Gravity_Long_N,"
-         << "Max_Grip_N,Long_Grip_N,Max_Traction_N,Engine_Braking_N,Desired_Braking_N,Desired_Engine_N,"
+         << "Total_Mass_kg,Pitch_Angle_rad,Drag_Force_N,Downforce_N,Normal_Force_N,Lateral_Force_N,Gravity_Long_N,"
+         << "Max_Grip_N,Long_Grip_N,Max_Traction_N,Engine_Braking_N,Desired_Engine_N,"
          << "Applied_Long_Force_N,Load_FL_N,Load_FR_N,Load_RL_N,Load_RR_N\n";
 
     for (int i = 0; i < num_segments; ++i) {
@@ -261,12 +257,11 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
              << pt.tyre_temp_fl << "," << pt.tyre_temp_fr << ","
              << pt.tyre_temp_rl << "," << pt.tyre_temp_rr << ","
              << pt.total_mass << "," << pt.pitch_angle << ","
-             << pt.drag_force << "," << pt.downforce << ","
+             << pt.drag_force << "," << pt.downforce << "," << pt.normal_force << ","
              << pt.lateral_force << "," << pt.gravity_longitudinal << ","
              << pt.max_grip << "," << pt.long_grip << ","
              << pt.max_traction_force << "," << pt.engine_braking_force << ","
-             << pt.desired_braking_force << "," << pt.desired_engine_force << ","
-             << pt.applied_long_force << ","
+             << pt.desired_engine_force << "," << pt.applied_long_force << ","
              << pt.load_fl << "," << pt.load_fr << "," << pt.load_rl << "," << pt.load_rr << "\n";
     }
 

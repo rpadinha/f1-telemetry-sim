@@ -41,6 +41,30 @@ struct CarSetup {
     float drag_coef;                    // Aerodynamic Coefficient
 };
 
+// keeps the dynamics of the car each dt (this was moved up because F1Car now holds this struct :) /)
+struct F1CarDynamics {
+    float total_mass;                   // mass_kg + fuel
+    float pitch_angle;                  // track pitch
+
+    float downforce;                    // downforce
+    float normal_force;                 // normal_force
+    float drag_force;                   // drag force
+    float lateral_force;                // lateral force
+    float gravity_longitudinal;         // gravity_longitudinal
+    
+    float max_grip;                     // max grip
+    float long_grip;                    // longitudinal grip
+    float max_traction_force;           // max traction force
+
+    float desired_engine_force;         //
+    float applied_long_force;           // real f_long that pedals gave!
+
+    float load_fl;                      // front left load
+    float load_fr;                      // front right load
+    float load_rl;                      // rear left load
+    float load_rr;                      // rear right load
+};
+
 // Keeps the state of the car every dt
 struct F1Car {
     float a;                            // Linear acceleration
@@ -73,6 +97,8 @@ struct F1Car {
     float tyre_wear_rl;                 // Rear-Left
     float tyre_wear_rr;                 // Rear-Right
 
+    F1CarDynamics dynamics;             // dynamics of f1car every dt
+
     // battery and fuel
     float battery_mj;                   // Ammount of battery
     float fuel_kg;                      // Ammount of fuel
@@ -82,30 +108,6 @@ struct F1Car {
     bool qualifying_mode;               // this is just cool to add for now but it states if its in qualifying mode or not, if it is then the car will not regenerate energy and will use more power to simulate a qualifying lap
 
     int laps_completed;                 // amount of laps completed by the sim for controlling better
-};
-
-// keeps the dynamics of the car each dt
-struct F1CarDynamics {
-    float total_mass;                   // mass_kg + fuel
-    float pitch_angle;                  // track pitch
-
-    float drag_force;                   // drag force
-    float lateral_force;                // lateral force
-    float gravity_longitudinal;         // gravity_longitudinal
-    
-    float max_grip;                     // max grip
-    float long_grip;                    // longitudinal grip
-    float max_traction_force;           // max traction force
-    float engine_braking_force;         // engine braking
-
-    float desired_braking_force;        // desired braking
-    float desired_engine_force;         // desired power
-    float applied_long_force;           // real f_long that pedals gave!
-
-    float load_fl;                      // front left load
-    float load_fr;                      // front right load
-    float load_rl;                      // rear left load
-    float load_rr;                      // rear right load
 };
 
 // track segment struct for track handling
@@ -149,6 +151,7 @@ struct TelemetryPoint {
 
     float total_mass;
     float pitch_angle;
+    float normal_force;
     float drag_force;
     float downforce;
     float lateral_force;
@@ -157,7 +160,6 @@ struct TelemetryPoint {
     float long_grip;
     float max_traction_force;
     float engine_braking_force;
-    float desired_braking_force;
     float desired_engine_force;
     float applied_long_force;
     float load_fl;

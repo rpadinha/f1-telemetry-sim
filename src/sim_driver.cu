@@ -3,24 +3,27 @@
 
 
 // get max deceleration according to the average speed during braking also taking into account the pitch_angle
-__host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu) {
+__host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu, float total_mass) {
     // first we calculate the aerodynamics at current speed v_ms
     float drag = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * setup->drag_coef * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (v_ms * v_ms) * (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
-    float nominal_load = (setup->mass_kg) * Config::GRAVITY;
+    float nominal_load = total_mass * Config::GRAVITY;
 
     // mechanical grip with curr tyres
-    float normal_force = (setup->mass_kg * Config::GRAVITY * cosf(pitch_angle)) + downforce;
+    float normal_force = (total_mass * Config::GRAVITY * cosf(pitch_angle)) + downforce;
     if (normal_force < 0.0f) { normal_force = 0.0f; }
     
     float final_mu = apply_load_sensitivity(base_mu, normal_force, nominal_load);
     float max_mech_brake = normal_force * final_mu;
+    if (max_mech_brake > Config::MAX_BRAKE_SYSTEM_FORCE) {
+        max_mech_brake = Config::MAX_BRAKE_SYSTEM_FORCE;
+    }
 
     // total braking = brakes(tyres) + drag force
-    float total_brake_force = max_mech_brake + drag;
+    float total_brake_force = max_mech_brake + drag + (Config::MAX_ENGINE_BRAKING * 0.8f);
 
     // gravity impacts if its going up / should also affect when its going down
-    return total_brake_force / setup->mass_kg + (Config::GRAVITY * sinf(pitch_angle));
+    return total_brake_force / total_mass + (Config::GRAVITY * sinf(pitch_angle));
 }
 
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
@@ -29,12 +32,12 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
 
     float cl_a = (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
     float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
-    float nominal_load = (setup->mass_kg + car->fuel_kg) * Config::GRAVITY;
-    float current_normal = ((setup->mass_kg + car->fuel_kg) * Config::GRAVITY * cosf(current_pitch)) + downforce;
+    float nominal_load = car->dynamics.total_mass * Config::GRAVITY;
+    float current_normal = (car->dynamics.total_mass * Config::GRAVITY * cosf(current_pitch)) + downforce;
     if (current_normal < 0.0f) current_normal = 0.0f;
 
     float current_mu = apply_load_sensitivity(base_mu, current_normal, nominal_load);
-    float speed = sqrtf((current_mu * current_normal * track[car->current_seg].radius_m) / setup->mass_kg);
+    float speed = sqrtf((current_mu * current_normal * track[car->current_seg].radius_m) / car->dynamics.total_mass);
 
     // DYNAMIC LOOKAHEAD HORIZON: Scale distance based on kinetic energy state
     // At 340 km/h (94 m/s), this expands your horizon safely from 100m to 200-250m
@@ -50,23 +53,24 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
             // Decoupled 2-step Aero Prediction (Safe & stable)
             float v_guess_sq = base_mu * Config::GRAVITY * radius;
             float aero_df = 0.5f * Config::AIR_DENSITY * v_guess_sq * cl_a;
-            float future_normal = (setup->mass_kg * Config::GRAVITY * cosf(future_pitch)) + aero_df;
+            float future_normal = (car->dynamics.total_mass * Config::GRAVITY * cosf(future_pitch)) + aero_df;
             
             // Realistic Tire Grip Calculation
             float future_mu = apply_load_sensitivity(base_mu, future_normal, nominal_load);
             
             // Absolute Physics-Safe Speed Limit
-            float corner_v_sq = (future_normal * future_mu * radius) / setup->mass_kg;
+            float corner_v_sq = (future_normal * future_mu * radius) / car->dynamics.total_mass;
             float corner_v = sqrtf(corner_v_sq);
 
             // Balanced Deceleration & Braking Profile
             // Using car->v keeps the deceleration profile tied to physical state, not lookahead iteration
             // fixed: evaluate deceleration based on the profile of the target segment's pitch angle
-            float avg_speed_during_braking = (car->v + corner_v) * 0.5f;
-            float effective_decel = get_max_deceleration(avg_speed_during_braking, future_pitch, setup, base_mu);
+            // Root-Mean-Square (RMS) speed accurately represents v^2 aerodynamic forces during braking
+            float rms_speed_during_braking = sqrtf((car->v * car->v + corner_v_sq) * 0.5f);
+            float effective_decel = get_max_deceleration(rms_speed_during_braking, future_pitch, setup, base_mu, car->dynamics.total_mass);
             
-            // Tuned safety margin (0.90f = 10% margin) to bridge early/late discrepancies
-            effective_decel *= 0.90f; 
+            // Tuned safety margin (0.92f = 8% margin) to bridge early/late discrepancies
+            effective_decel *= 0.92f; 
             if (effective_decel < 1.0f) effective_decel = 1.0f;
 
             // Torricelli Threat Evaluation
@@ -140,18 +144,20 @@ __host__ __device__ void update_ers(F1Car* car, const CarSetup* setup, const Tra
     }
 }
 
-__host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamics, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
+__host__ __device__ void update_driver_pedals(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
+    F1CarDynamics& dynamics = car->dynamics;
     float target_throttle = 0.0f;
     float target_brake = 0.0f;
 
     switch (car->action) {
         case DriverAction::BRAKE: {
-            float lateral_usage = (dynamics.max_grip > 1e-3f) ? (dynamics.lateral_force / dynamics.max_grip) : 0.0f;
+            float kamm_brake_ratio = (dynamics.max_grip > 1e-3f) ? (dynamics.long_grip / dynamics.max_grip) : 1.0f;
+            target_brake = kamm_brake_ratio;
+            if (target_brake > 1.0f) target_brake = 1.0f;
+            if (target_brake < 0.15f) target_brake = 0.15f;
 
-            target_brake = 1.0f - (lateral_usage * 0.7f);
-            if (target_brake < 0.2f) { target_brake = 0.2f; }
             target_throttle = 0.0f;
-            car->throttle_pedal = 0.0f;
+            car->throttle_pedal = target_throttle;
             break;
         }
         case DriverAction::COAST: {
@@ -172,6 +178,11 @@ __host__ __device__ void update_driver_pedals(F1Car* car, F1CarDynamics& dynamic
             target_throttle = 1.0f - lateral_ratio;
             if (target_throttle > 1.0f) target_throttle = 1.0f;
             if (target_throttle < 0.0f) target_throttle = 0.0f;
+            if (dynamics.desired_engine_force > 1e-3f) {
+                float traction_limited_pedal = dynamics.max_traction_force / dynamics.desired_engine_force;
+                if (traction_limited_pedal > 1.0f) traction_limited_pedal = 1.0f;
+                target_throttle = (traction_limited_pedal < target_throttle) ? traction_limited_pedal : target_throttle;
+            }
             break;
         }
     }

@@ -1,6 +1,7 @@
 #ifndef POWERTRAIN_CUH
 #define POWERTRAIN_CUH
 
+#include <iostream>
 #include "config.cuh"
 #include "physics.cuh"
 
@@ -8,22 +9,29 @@ __host__ __device__ void update_transmission(F1Car* car) {
     float wheel_omega = car->v / Config::WHEEL_RADIUS;
     car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f; // 9.5492 is the conversion factor from rad/s to RPM
 
-    if (car->rpm > Config::RPM_UPSHIFT && car->current_gear < 8) {
-        car->current_gear++;
-        car->gear_shift_timer = 0.025f;         // 25ms cut of power
-        car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f;
-    } else if (car->current_gear > 1) {
-        float dynamic_downshift_rpm = Config::RPM_DOWNSHIFT;
-
-        if (car->action == DriverAction::BRAKE && car->brake_pedal > 0.6f) { dynamic_downshift_rpm = 6000.0f; }
-
-        else if (car->action == DriverAction::COAST) { dynamic_downshift_rpm = 7000.0f; }
-
-        if (car->rpm < dynamic_downshift_rpm) {
-            car->current_gear--;
+    if (car->current_gear < 8) {
+        if (car->current_gear == 2 && car->throttle_pedal > 0.8f) {
+            car->current_gear++;
+            car->gear_shift_timer = 0.025f;         // 25ms cut of power
+            car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f;
+        } else if (car->rpm > Config::RPM_UPSHIFT) {
+            car->current_gear++;
+            car->gear_shift_timer = 0.025f;         // 25ms cut of power
             car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f;
         }
-    }
+    } else if (car->current_gear > 1) {
+        float dynamic_rpm = Config::RPM_DOWNSHIFT;
+        if (car->current_gear == 8) {
+            dynamic_rpm *= 0.85f;
+        } else if (car->action == DriverAction::BRAKE) {
+            dynamic_rpm *= 0.75;
+        }
+
+        if (car->rpm < dynamic_rpm) {
+            car->current_gear--;
+            car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f;
+            }
+        }
 }
 
 __host__ __device__ void upshift_cut(F1Car* car, float dt) {

@@ -13,7 +13,12 @@ __host__ __device__ inline float get_engine_power_kw(float rpm, float max_power_
     return max_power_kw * rpm_factor;
 }
 
-// Toque & Contanct Patch Drive Force
+// Engine braking force based on current RPM
+__host__ __device__ inline float get_engine_braking_force(float rpm) {
+    return (rpm / Config::RPM_REDLINE) * Config::MAX_ENGINE_BRAKING;
+}
+
+// Toque & Contact Patch Drive Force
 // P = tau * Omega -> Tau = P / Omega -> F_wheel = (tau * GearRatio * FinalDrive) / WheelRadius
 __host__ __device__ inline float compute_drive_force(const F1Car* car, const CarSetup* setup, float extra_power_kw) {
     if (car->throttle_pedal <= 0.0f || car->gear_shift_timer > 0.0f) return 0.0f;
