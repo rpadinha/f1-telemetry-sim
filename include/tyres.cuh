@@ -13,7 +13,6 @@ __host__ __device__ inline float calculate_tyre_grip(TyreCompound compound, floa
     float delta_temp = temp_c - properties.opt_temp_c;
     float normalized_diff = delta_temp / properties.temp_window_c;
     float eta_temp = 1.0f - (normalized_diff * normalized_diff * 0.25f);
-
     if (eta_temp < 0.65f) eta_temp = 0.65f;
 
     float eta_wear = 1.0f - (wear_pct * 0.35f);
@@ -78,9 +77,9 @@ __host__ __device__ inline void update_tyres(F1Car* car, float dt) {
 }
 
 // Load Degressivity (instead of grip growing perfectly linear with vertical load)
-__host__ __device__ inline float apply_load_sensitivity(float base_mu, float normal_force, float nominal_load) {
+__host__ __device__ inline float apply_load_sensitivity(float base_mu, float normal_force, float nominal_load_per_tyre) {
     constexpr float LOAD_SENSITIVITY = 0.000012f;
-    float delta_load = normal_force - nominal_load;
+    float delta_load = normal_force - nominal_load_per_tyre;
     if (delta_load < 0.0f) delta_load = 0.0f;
     return base_mu / (1.0f + LOAD_SENSITIVITY * delta_load);
 }

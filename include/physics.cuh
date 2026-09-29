@@ -56,6 +56,7 @@ struct F1CarDynamics {
     float long_grip;                    // longitudinal grip
     float max_traction_force;           // max traction force
 
+    float engine_braking_force;
     float desired_engine_force;         //
     float applied_long_force;           // real f_long that pedals gave!
 
