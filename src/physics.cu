@@ -11,6 +11,9 @@
 
 __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
 
+    // this should be first
+    car->dynamics = calculate_car_dynamics(car, setup, track, num_segments);
+    // for this get_allowed speed
     float target_speed = get_allowed_speed(car, setup, track, num_segments);
     float speed_error = car->v - target_speed;
 
@@ -25,7 +28,6 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
     // 1. Compute base vehicle dynamics once per dt and store in car->dynamics
-    car->dynamics = calculate_car_dynamics(car, setup, track, num_segments);
 
     // 2. Driver & Power Unit updates (populates car->dynamics.desired_engine_force)
     update_driver_pedals(car, setup, track, num_segments, dt);
@@ -103,13 +105,13 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         results[idx].setup_id = setup.id;
         results[idx].lap_time = car.time_s;
         results[idx].top_speed_kmh = max_speed * 3.6f; 
-        results[idx].battery_used_mj = car.battery_mj;
+        results[idx].battery_used_mj = Config::MAX_BATTERY_MJ - car.battery_mj;
     }
 }
 
 __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track, int num_segments, TelemetryPoint* out_telemetry) {
     F1Car car;
-
+    
     car.v = track[0].real_speed_kmh / 3.6f;
     car.a = 0.0f;
     car.battery_mj = 4.0f;
@@ -153,8 +155,6 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
             pt.throttle = car.throttle_pedal;
             pt.brake = car.brake_pedal;
             pt.time_s = car.time_s;
-            pt.tyre_temp_front = (car.tyre_temp_fl + car.tyre_temp_fr) * 0.5f;
-            pt.tyre_temp_rear  = (car.tyre_temp_rl + car.tyre_temp_rr) * 0.5f;
 
             pt.tyre_temp_fl = car.tyre_temp_fl;
             pt.tyre_temp_fr = car.tyre_temp_fr;
@@ -173,6 +173,8 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
             pt.max_traction_force   = dyn.max_traction_force;
             pt.engine_braking_force = get_engine_braking_force(car.rpm);
             pt.desired_engine_force = dyn.desired_engine_force;
+            pt.slip_angle_rad       = dyn.slip_angle_rad;
+            pt.cornering_drag       = dyn.cornering_drag;
             pt.applied_long_force   = dyn.applied_long_force;
             pt.load_fl              = dyn.load_fl;
             pt.load_fr              = dyn.load_fr;
@@ -214,7 +216,7 @@ void run_simulation_batch(const CarSetup* setups, SimResult* results, const Trac
     cudaFree(d_results);
 }
 
-void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* h_track, int num_segments, std::string year, std::string gp, std::string session) {
+void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* h_track, int num_segments, const std::string EXPORT_PATH, std::string year, std::string gp, std::string session) {
     TrackSegment* d_track;
     TelemetryPoint* d_telemetry;
 
@@ -223,6 +225,7 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
 
     cudaMalloc(&d_track, track_size);
     cudaMalloc(&d_telemetry, telemetry_size);
+    cudaMemset(d_telemetry, 0, telemetry_size);
 
     cudaMemcpy(d_track, h_track, track_size, cudaMemcpyHostToDevice);
 
@@ -232,10 +235,9 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
     TelemetryPoint* h_telemetry = new TelemetryPoint[num_segments];
     cudaMemcpy(h_telemetry, d_telemetry, telemetry_size, cudaMemcpyDeviceToHost);
 
-    std::string export_path = "../data/" + year + "_" + gp + "_" + session + "_sim.csv";
-    std::ofstream file(export_path);
+    std::ofstream file(EXPORT_PATH);
     if (!file.is_open()) {
-        std::cerr << "[CSV] Error opening " + export_path + "!\n";
+        std::cerr << "[CSV] Error opening " + EXPORT_PATH + "!\n";
         delete[] h_telemetry;
         cudaFree(d_track);
         cudaFree(d_telemetry);
@@ -243,9 +245,9 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
     }
 
     file << "Distance_m,Sim_Speed,Sim_RPM,Sim_Gear,Sim_Throttle,Sim_Brake,Sim_Time_s,"
-         << "Tyre_Temp_Front_C,Tyre_Temp_Rear_C,Tyre_Temp_FL_C,Tyre_Temp_FR_C,Tyre_Temp_RL_C,Tyre_Temp_RR_C,"
+         << "Tyre_Temp_FL_C,Tyre_Temp_FR_C,Tyre_Temp_RL_C,Tyre_Temp_RR_C,"
          << "Total_Mass_kg,Pitch_Angle_rad,Drag_Force_N,Downforce_N,Normal_Force_N,Lateral_Force_N,Gravity_Long_N,"
-         << "Max_Grip_N,Long_Grip_N,Max_Traction_N,Engine_Braking_N,Desired_Engine_N,"
+         << "Max_Grip_N,Long_Grip_N,Max_Traction_N,Engine_Braking_N,Desired_Engine_N,Slip_Angle,Drag_Corner,"
          << "Applied_Long_Force_N,Load_FL_N,Load_FR_N,Load_RL_N,Load_RR_N\n";
 
     for (int i = 0; i < num_segments; ++i) {
@@ -253,7 +255,6 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
         file << i << ","
              << pt.speed_kmh << "," << pt.rpm << "," << pt.gear << ","
              << pt.throttle << "," << pt.brake << "," << pt.time_s << ","
-             << pt.tyre_temp_front << "," << pt.tyre_temp_rear << ","
              << pt.tyre_temp_fl << "," << pt.tyre_temp_fr << ","
              << pt.tyre_temp_rl << "," << pt.tyre_temp_rr << ","
              << pt.total_mass << "," << pt.pitch_angle << ","
@@ -261,12 +262,13 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
              << pt.lateral_force << "," << pt.gravity_longitudinal << ","
              << pt.max_grip << "," << pt.long_grip << ","
              << pt.max_traction_force << "," << pt.engine_braking_force << ","
-             << pt.desired_engine_force << "," << pt.applied_long_force << ","
+             << pt.desired_engine_force << "," << pt.slip_angle_rad << ","
+             << pt.cornering_drag << "," << pt.applied_long_force << ","
              << pt.load_fl << "," << pt.load_fr << "," << pt.load_rl << "," << pt.load_rr << "\n";
     }
 
     file.close();
-    std::cout << "[GPU/CPU] Telemetry Exported to: " + export_path + "\n";
+    std::cout << "[GPU/CPU] Telemetry Exported to: " + EXPORT_PATH + "\n";
 
     delete[] h_telemetry;
     cudaFree(d_track);

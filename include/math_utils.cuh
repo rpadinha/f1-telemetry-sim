@@ -26,21 +26,8 @@ __host__ __device__ inline float get_track_pitch_angle(const TrackSegment* track
     return asinf(ratio);
 }
 
-// vector product to get the lateral load
-// also does the average harmonic to smooth radius (1/R)
-__host__ __device__ inline void get_corner_geometry(const TrackSegment* track, int current_seg, int num_segments, float& out_radius, float& out_lat_dir) {
-    // harmonic average in a 5 segment radius
-    float sum_curvature = 0.0f;
-    for (int offset = -2 ; offset <= 2 ; offset++) {
-        int idx = (current_seg + offset + num_segments) % num_segments;
-        float r = track[idx].radius_m;
-        if (r < 10.f) { r = 10.0f; }
-        sum_curvature += (1.0f / r);
-    }
-
-    out_radius = 5.0f / sum_curvature;
-
-    // detecting curve direction using x,y yupii
+// Returns +1.0f for right turn (weight shifts left), -1.0f for left turn (weight shifts right)
+__host__ __device__ inline float get_turn_direction(const TrackSegment* track, int current_seg, int num_segments) {
     int prev_seg = (current_seg - 2 + num_segments) % num_segments;
     int next_seg = (current_seg + 2 + num_segments) % num_segments;
 
@@ -50,10 +37,7 @@ __host__ __device__ inline void get_corner_geometry(const TrackSegment* track, i
     float dy2 = track[next_seg].y - track[current_seg].y;
 
     float cross_z = (dx1 * dy2) - (dy1 * dx2);
-
-    // if cross_z < 0 -> right turn -> weight goes left (+1 in load_fl/load_rl)
-    // if cross_z > 0 -> left turn -> weight goes right (+1 in load_fr/load_rr)
-    out_lat_dir = (cross_z < 0.0f) ? 1.0f : -1.0f;
+    return (cross_z < 0.0f) ? 1.0f : -1.0f;
 }
 
 __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
@@ -88,22 +72,22 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     if (front_force < 0.0f) front_force = 0.0f;
     if (rear_force < 0.0f) rear_force = 0.0f;
 
-    // lateral loads with 2d geometry
-    float smoothed_radius = track[car->current_seg].radius_m;
-    float lat_dir = 1.0f;
-    // passing smoothed_radius and lat_dir to get_corner_geometry will set their values according to the functions calc
-    get_corner_geometry(track, car->current_seg, num_segments, smoothed_radius, lat_dir);
-    
+    // Direct radius lookup from the track segment
+    float radius = track[car->current_seg].radius_m;
+    float lat_dir = get_turn_direction(track, car->current_seg, num_segments);
+
     // Centrifugal cornering load: F_lat = (m * v^2) / R
-    dynamics.lateral_force = (dynamics.total_mass * car->v * car->v) / smoothed_radius;
+    dynamics.lateral_force = (dynamics.total_mass * car->v * car->v) / radius;
 
     // assuming track width of 1.6m
     float weight_transfer_lat = (dynamics.lateral_force * Config::GRAVITY_CENTER_HEIGHT) / 1.6f;
+    float lat_transfer_front = 0.5f * weight_transfer_lat;
+    float lat_transfer_rear  = 0.5f * weight_transfer_lat;
 
-    dynamics.load_fl = (front_force * 0.5f) + (weight_transfer_lat * lat_dir);
-    dynamics.load_fr = (front_force * 0.5f) - (weight_transfer_lat * lat_dir);
-    dynamics.load_rl = (rear_force * 0.5f)  + (weight_transfer_lat * lat_dir);
-    dynamics.load_rr = (rear_force * 0.5f)  - (weight_transfer_lat * lat_dir);
+    dynamics.load_fl = (front_force * 0.5f) + (lat_transfer_front * lat_dir);
+    dynamics.load_fr = (front_force * 0.5f) - (lat_transfer_front * lat_dir);
+    dynamics.load_rl = (rear_force * 0.5f)  + (lat_transfer_rear * lat_dir);
+    dynamics.load_rr = (rear_force * 0.5f)  - (lat_transfer_rear * lat_dir);
     if (dynamics.load_fl < 0.0f) dynamics.load_fl = 0.0f;
     if (dynamics.load_fr < 0.0f) dynamics.load_fr = 0.0f;
     if (dynamics.load_rl < 0.0f) dynamics.load_rl = 0.0f;
@@ -123,12 +107,17 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
 
     dynamics.max_grip = grip_fl + grip_fr + grip_rl + grip_rr;
 
-    // Kamm Circle: F_long,grip = sqrt(F_grip,max^2 - F_lat^2)
-    if (dynamics.max_grip > dynamics.lateral_force) {
-        dynamics.long_grip = sqrtf(dynamics.max_grip * dynamics.max_grip - dynamics.lateral_force * dynamics.lateral_force);
-    } else {
-        dynamics.long_grip = 0.0f;
+    // pretection against the physics limit, sbins and lateral force hits the limit
+    if (dynamics.lateral_force > dynamics.max_grip) {
+        dynamics.lateral_force = dynamics.max_grip;
     }
+
+    dynamics.slip_angle_rad = calculate_slip_angle(dynamics.lateral_force, dynamics.max_grip);
+    dynamics.cornering_drag = dynamics.lateral_force * sinf(dynamics.slip_angle_rad);
+
+    // Kamm Circle: Flong_grip = sqrtf(F_gripmax² - Flat²)
+    float diff = (dynamics.max_grip * dynamics.max_grip) - (dynamics.lateral_force * dynamics.lateral_force);
+    dynamics.long_grip = sqrtf(fmaxf(0.0f, diff));
 
     // For F1 only Rear tyres accel so f1 is rwd so grip all rear lmao
     float rear_max_grip = grip_rl + grip_rr;
@@ -137,7 +126,7 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
 
     // Maximum traction force limited by dynamic rear vertical load
     if (rear_max_grip > rear_lateral_force) {
-        dynamics.max_traction_force = sqrtf(rear_max_grip * rear_max_grip - rear_lateral_force * rear_lateral_force);
+        dynamics.max_traction_force = sqrtf((rear_max_grip * rear_max_grip) - (rear_lateral_force * rear_lateral_force));
     } else {
         dynamics.max_traction_force = 0.0f;
     }
@@ -161,11 +150,11 @@ __host__ __device__ inline float compute_net_force(const F1Car* car) {
             float requested_brake = car->brake_pedal * Config::MAX_BRAKE_SYSTEM_FORCE;
             float applied_brake_force = (requested_brake > dynamics.long_grip) ? dynamics.long_grip : requested_brake;
 
-            net_force = -applied_brake_force - dynamics.drag_force - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
+            net_force = -applied_brake_force - dynamics.drag_force - dynamics.cornering_drag - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
             break;
         }
         case DriverAction::COAST: {
-            net_force = -dynamics.drag_force - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
+            net_force = -dynamics.drag_force - dynamics.cornering_drag - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
             break;
         }
         case DriverAction::ACCELERATE: {
@@ -174,7 +163,7 @@ __host__ __device__ inline float compute_net_force(const F1Car* car) {
                                        ? dynamics.max_traction_force 
                                        : requested_engine;
 
-            net_force = applied_engine_force - dynamics.drag_force + dynamics.gravity_longitudinal;
+            net_force = applied_engine_force - dynamics.drag_force - dynamics.cornering_drag + dynamics.gravity_longitudinal;
             break;
         }
     }

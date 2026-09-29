@@ -27,51 +27,67 @@ __host__ __device__ inline float calculate_effective_grip(const F1Car* car) {
     return calculate_tyre_grip(car->current_compound, avg_temp, avg_wear);
 }
 
+__host__ __device__ inline float calculate_slip_angle(float f_lat, float max_grip) {
+    if (max_grip <= 1e-3f) return 0.0f;
+
+
+    float fy_norm = f_lat / max_grip;
+
+    float peak_sin = sinf(Config::PACEJKA_C * 1.5708f);
+
+    if (fy_norm > peak_sin * 0.99f) { fy_norm = peak_sin * 0.99f; }
+    float alpha_rad = (1.0f / Config::PACEJKA_B) * tanf(asinf(fy_norm) / Config::PACEJKA_C);
+
+    return alpha_rad;
+}
+
 // thermal balance & wear integration per timestep
 __host__ __device__ inline void update_tyres(F1Car* car, float dt) {
     TyreProperties properties = Config::get_tyre_properties(car->current_compound);
     const F1CarDynamics& dynamics = car->dynamics;
 
-    // total load 
-    float total_load = dynamics.load_fl + dynamics.load_fr + dynamics.load_rl + dynamics.load_rr;
-    if (total_load < 1.0f) total_load = 1.0f; // avoid division by 1.0f / 0.f
-
-
     float* temps[4] = { &car->tyre_temp_fl, &car->tyre_temp_fr, &car->tyre_temp_rl, &car->tyre_temp_rr };
     float* wears[4] = { &car->tyre_wear_fl, &car->tyre_wear_fr, &car->tyre_wear_rl, &car->tyre_wear_rr };
     float loads[4]  = { dynamics.load_fl, dynamics.load_fr, dynamics.load_rl, dynamics.load_rr };
 
-    // Longitudinal bias: braking makes fronts more hot (60/40), accelerating gives more heat to the rear (40/60)
-    float long_bias[4] = {
-        (car->a < 0.0f) ? 0.60f : 0.40f, // FL
-        (car->a < 0.0f) ? 0.60f : 0.40f, // FR
-        (car->a > 0.0f) ? 0.60f : 0.40f, // RL
-        (car->a > 0.0f) ? 0.60f : 0.40f  // RR
-    };
-
-    float air_cooling_factor = 0.008f * sqrt(car->v + 1.0f);
+    float total_load = loads[0] + loads[1] + loads[2] + loads[3];
+    if (total_load < 1.0f) total_load = 1.0f;
     
-    for (int i = 0 ; i < 4 ; i++) {
-        // The force this tyre suffers is based on the weight percentage
+    for (int i = 0; i < 4; i++) {
         float load_ratio = loads[i] / total_load;
-        
+
+        // 1. Corner-specific lateral force based on individual wheel vertical load
         float f_lat_i = dynamics.lateral_force * load_ratio;
-        float f_long_i = (fabsf(car->a) * dynamics.total_mass) * load_ratio * long_bias[i] * 2.0f; // x2 because bias goes for both
 
-        // combined tangencial force (sqrt(Fx^2 + Fy^2))
-        float f_tangential = sqrtf(f_lat_i * f_lat_i + f_long_i * f_long_i);
+        // 2. Corner-specific longitudinal force:
+        // Braking (car->a < 0): 60% front axle, 40% rear axle
+        // Throttle (car->a > 0): 100% REAR AXLE ONLY (F1 is RWD)
+        float f_long_i = 0.0f;
+        if (car->a < 0.0f) {
+            f_long_i = (i < 2) ? (fabsf(car->a) * dynamics.total_mass * 0.30f)   // 60% front / 2 wheels
+                               : (fabsf(car->a) * dynamics.total_mass * 0.20f);  // 40% rear / 2 wheels
+        } else {
+            f_long_i = (i < 2) ? 0.0f                                            // Fronts produce 0 driving force
+                               : (car->a * dynamics.total_mass * 0.50f);        // Rears carry all drive torque
+        }
 
-        // Q_in = F_tangential * v * k_friction
-        float heat = f_tangential * car->v * 0.00008f;
-        float cool = air_cooling_factor * (*temps[i] - Config::AMBIENT_TEMP_C);
+        // 3. Friction work from sliding slip velocity
+        float v_slip_lat = car->v * sinf(dynamics.slip_angle_rad);
+        float heat_friction = (f_lat_i * v_slip_lat * 0.00020f) + (f_long_i * 0.000085f);
 
-        *temps[i] += (heat - cool) * dt;
+        // 4. Carcass flexing (viscoelastic hysteresis)
+        float heat_carcass = loads[i] * (car->v + 15.0f) * 0.0000045f;
+
+        // 5. Thermal equilibrium: track conduction & convective air cooling
+        float q_track = 0.012f * (Config::TRACK_TEMP_C - *temps[i]);
+        float cool    = 0.0022f * sqrtf(car->v + 1.0f) * (*temps[i] - Config::AMBIENT_TEMP_C);
+
+        *temps[i] += (heat_friction + heat_carcass + q_track - cool) * dt;
         if (*temps[i] < Config::AMBIENT_TEMP_C) *temps[i] = Config::AMBIENT_TEMP_C;
 
-        // progressive wear as tangencial force to the tyre
-        float stress_multiplier = 1.0f + (f_tangential / 3000.0f);
-        *wears[i] += properties.wear_rate * stress_multiplier * (car->v * dt);
-        
+        // Wear integration
+        float f_tangential = sqrtf(f_lat_i * f_lat_i + f_long_i * f_long_i);
+        *wears[i] += properties.wear_rate * (1.0f + f_tangential / 3000.0f) * (car->v * dt);
         if (*wears[i] > 1.0f) *wears[i] = 1.0f;
     }
 }

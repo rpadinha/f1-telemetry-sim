@@ -39,8 +39,8 @@ namespace Config {
     }
 
     constexpr float RPM_REDLINE = 12800.0f;             // Redline RPM of the car // wowzers
-    constexpr float RPM_UPSHIFT = 11800.0f;            // Ideal upshift RPM of the car
-    constexpr float RPM_DOWNSHIFT = 9000.0f;            // Ideal downshift RPM of the car
+    constexpr float RPM_UPSHIFT = 11300.0f;            // Ideal upshift RPM of the car
+    constexpr float RPM_DOWNSHIFT = 7000.0f;            // Ideal downshift RPM of the car
     constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power
     constexpr float RPM_IDLE = 5000.f;                  // RPM idle
     constexpr float MAX_ENGINE_BRAKING = 1500.0f;       // Engine braking max force
@@ -64,6 +64,10 @@ namespace Config {
                 return { 1.60f, 105.0f, 10.0f, 0.0014f, 0.000018f };
         }
     }
+
+    // pacejka constantes for slick tyres in F1 (maybe we can optimize this?) with setups
+    constexpr float PACEJKA_C = 1.2f;                   // shape factor
+    constexpr float PACEJKA_B = 14.0f;                  // rigid factor of the tyre
 
     // track and ambient
     constexpr float AMBIENT_TEMP_C = 25.0f;             // ambient temperature (Cº)

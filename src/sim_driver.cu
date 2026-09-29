@@ -27,31 +27,30 @@ __host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, co
 }
 
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
-    float current_pitch = get_track_pitch_angle(track, car->current_seg, num_segments);
-    float base_mu = calculate_effective_grip(car);
+    float current_radius = track[car->current_seg].radius_m;
 
+    // the f1 ai trust the max_grip that the 4 tyres are saying now
+    float speed = sqrtf((car->dynamics.max_grip * current_radius) / car->dynamics.total_mass);
+
+    // base coefficient at the moment to predict the future
+    float base_mu = (car->dynamics.normal_force > 1e-3f) ? (car->dynamics.max_grip / car->dynamics.normal_force) : 1.5f;
     float cl_a = (setup->drag_coef * 3.f) * Config::FRONTAL_AREA;
-    float downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
     float nominal_load = car->dynamics.total_mass * Config::GRAVITY;
-    float current_normal = (car->dynamics.total_mass * Config::GRAVITY * cosf(current_pitch)) + downforce;
-    if (current_normal < 0.0f) current_normal = 0.0f;
-
-    float current_mu = apply_load_sensitivity(base_mu, current_normal, nominal_load);
-    float speed = sqrtf((current_mu * current_normal * track[car->current_seg].radius_m) / car->dynamics.total_mass);
 
     // DYNAMIC LOOKAHEAD HORIZON: Scale distance based on kinetic energy state
-    // At 340 km/h (94 m/s), this expands your horizon safely from 100m to 200-250m
-    float dynamic_lookahead = Config::LOOKAHEAD_METERS + (car->v * 2.0f);
+    // At 340 km/h (94 m/s), this expands your horizon safely from 100m to 150-200m
+    float dynamic_lookahead = Config::LOOKAHEAD_METERS + (car->v * 1.5f);
     float dist_to_curve = track[car->current_seg].length_m - car->current_m;
+
     for (int i = 1; dist_to_curve < dynamic_lookahead; ++i) {
         int lookahead = (car->current_seg + i) % num_segments;
-        
-        if (!is_straight(track[lookahead].radius_m, setup)) {
-            float radius = track[lookahead].radius_m;
+        float future_radius = track[lookahead].radius_m;
+
+        if (future_radius < 1000.0f) {
             float future_pitch = get_track_pitch_angle(track, lookahead, num_segments);
             
             // Decoupled 2-step Aero Prediction (Safe & stable)
-            float v_guess_sq = base_mu * Config::GRAVITY * radius;
+            float v_guess_sq = base_mu * Config::GRAVITY * future_radius;
             float aero_df = 0.5f * Config::AIR_DENSITY * v_guess_sq * cl_a;
             float future_normal = (car->dynamics.total_mass * Config::GRAVITY * cosf(future_pitch)) + aero_df;
             
@@ -59,7 +58,7 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
             float future_mu = apply_load_sensitivity(base_mu, future_normal, nominal_load);
             
             // Absolute Physics-Safe Speed Limit
-            float corner_v_sq = (future_normal * future_mu * radius) / car->dynamics.total_mass;
+            float corner_v_sq = (future_normal * future_mu * future_radius) / car->dynamics.total_mass;
             float corner_v = sqrtf(corner_v_sq);
 
             // Balanced Deceleration & Braking Profile

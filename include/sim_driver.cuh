@@ -7,7 +7,7 @@
 #include "engine.cuh"
 
 // getting max deceleration
-__host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu);
+__host__ __device__ float get_max_deceleration(float v_ms, float pitch_angle, const CarSetup* setup, float base_mu, float total_mass);
 
 // getting allowed speed
 __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments);

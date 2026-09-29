@@ -39,8 +39,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const std::string IMPORT_FILE = root + "/data/" + year + "_" + gp + "_" + session + ".csv";
-    const std::string EXPORT_FILE = root + "/data/" + year + "_" + gp + "_" + session + "_sim.csv";
+    const std::string IMPORT_FILE = root + "/data/" + year + "_" + gp + "_" + session + "/" + year + "_" + gp + "_" + session + ".csv";
+    const std::string EXPORT_FILE = root + "/data/" + year + "_" + gp + "_" + session + "/" + year + "_" + gp + "_" + session + "_sim.csv";
     std::cout << "[CPU] Loading circuit from: " << IMPORT_FILE << std::endl;
 
     std::vector<TrackSegment> track = load_circuit_csv(IMPORT_FILE);
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
     std::cout << "[CPU] ----- Max Velocity: " << results[0].top_speed_kmh << std::endl;
 
     // export telemetry to csv
-    export_simulated_telemetry(pole_position_setup, track.data(), track.size(), year, gp, session);
+    export_simulated_telemetry(pole_position_setup, track.data(), track.size(), EXPORT_FILE, year, gp, session);
 
     // python script for comparisons vs real data
     std::string plot1_script_path = root + "/scripts/plot_comparisons.py";

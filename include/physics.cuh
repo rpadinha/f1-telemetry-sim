@@ -51,7 +51,9 @@ struct F1CarDynamics {
     float drag_force;                   // drag force
     float lateral_force;                // lateral force
     float gravity_longitudinal;         // gravity_longitudinal
-    
+    float cornering_drag;               // drag induced by the slip angle of tyres (Pacejka Magic Formula!!)
+
+    float slip_angle_rad;               // slip angle in rad/s
     float max_grip;                     // max grip
     float long_grip;                    // longitudinal grip
     float max_traction_force;           // max traction force
@@ -142,14 +144,12 @@ struct TelemetryPoint {
     float throttle;                     // throttle (%)
     float brake;                        // brake (%)
     float time_s;                       // time (s)
-    float tyre_temp_front;              // average temp front (Cº)
-    float tyre_temp_rear;               // average temp rear (Cº)
 
     float tyre_temp_fl;
     float tyre_temp_fr;
     float tyre_temp_rl;
     float tyre_temp_rr;
-
+    
     float total_mass;
     float pitch_angle;
     float normal_force;
@@ -158,6 +158,8 @@ struct TelemetryPoint {
     float lateral_force;
     float gravity_longitudinal;
     float max_grip;
+    float slip_angle_rad;
+    float cornering_drag;
     float long_grip;
     float max_traction_force;
     float engine_braking_force;
@@ -174,6 +176,6 @@ CUDA_CALLABLE void step_physics(F1Car* car, const CarSetup* setup, const TrackSe
 // runs the simulate lap for N setups using the step_physics integration
 void run_simulation_batch(const CarSetup* setups, SimResult* results, const TrackSegment* track, int num_segments, int numSetups);
 // exports the best setup for csv
-void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* d_track, int num_segments, std::string year, std::string gp, std::string session);
+void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* d_track, int num_segments, const std::string EXPORT_PATH, std::string year, std::string gp, std::string session);
 
 #endif

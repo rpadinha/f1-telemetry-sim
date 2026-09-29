@@ -24,6 +24,11 @@ def main():
     cache_dir = os.path.join(script_dir, "cache")
     if not os.path.exists(cache_dir):
       os.makedirs(cache_dir)
+
+    # Exporting to ../data folder
+    if not os.path.exists("../data"):
+        os.makedirs("../data")
+    
     fastf1.Cache.enable_cache(cache_dir)
 
     # Loading the session data (Ex: Monza 2025 Qualifying)
@@ -84,36 +89,37 @@ def main():
     x_rot = df["X"] * cos_theta - df["Y"] * sin_theta
     y_rot = df["X"] * sin_theta + df["Y"] * cos_theta
 
-    window_size = 10
-    df["X"] = pd.Series(x_rot).rolling(window=window_size, min_periods=1, center=True).mean().to_numpy()
-    df["Y"] = pd.Series(y_rot).rolling(window=window_size, min_periods=1, center=True).mean().to_numpy()
+    df["X"] = pd.Series(x_rot).to_numpy()
+    df["Y"] = pd.Series(y_rot).to_numpy()
 
-    # Curvature radius calculation
-    dx = np.gradient(df["X"])
-    dy = np.gradient(df["Y"])
-    ddx = np.gradient(dx)
-    ddy = np.gradient(dy)
+    # 1. Compute track heading angle along distance s
+    dx = np.gradient(df["X"], df["Distance"])
+    dy = np.gradient(df["Y"], df["Distance"])
 
-    numerator = np.abs(dx * ddy - dy * ddx)
-    denominator = (dx**2 + dy**2) ** 1.5 + 1e-8
+    # 2. Continuous heading angle (unwrap prevents -pi to +pi wrap jumps)
+    heading = np.unwrap(np.arctan2(dy, dx))
 
-    curvature = numerator / denominator
+    # 3. First derivative of heading gives exact signed curvature kappa (rad/m)
+    # Smooth heading slightly with a 100-meter Savitzky-Golay or rolling filter
+    from scipy.signal import savgol_filter
+    heading_smooth = savgol_filter(heading, window_length=100, polyorder=2)
+    curvature = np.abs(np.gradient(heading_smooth, df["Distance"]))
 
-    # Defines the maximum radius for curves
-    df["Radius"] = np.where(curvature > 1e-4, 1 / curvature, 10000)
-
-    df["Radius"] = df["Radius"].clip(upper=10000)
+    # 4. Safe Radius clamping
+    df["Radius"] = np.where(curvature > 0.01, 1.0 / curvature, 10000.0)
+    df["Radius"] = df["Radius"].clip(lower=30.0, upper=10000.0)
 
     # Segment length now will be always 1 meter
-    df["Segment_Length"] = df["Distance"].diff().fillna(df["Distance"].iloc[0])
+    df["Segment_Length"] = df["Distance"].diff().fillna(1.0)
 
-    # Exporting to ../data folder
-    if not os.path.exists("../data"):
-      os.makedirs("../data")
+    output_dir = f"../data/{year}_{gp}_{session_type}/"
+    if not os.path.exists(output_dir):
+       os.makedirs(output_dir)
 
-    output_path = f"../data/{year}_{gp}_{session_type}.csv"
-
+    output_path = output_dir + f"{year}_{gp}_{session_type}.csv"
     df[["Segment_Length", "Radius", "X", "Y", "Z", "DRS", "Real Speed", "RPM", "nGear", "Throttle", "Brake"]].to_csv(output_path, index=False)
+    # debug line for radius
+    #df[["Radius"]].to_csv(output_path, index=False)
 
     print(f"[PYTHON] Success! Exported {len(df)} segments to {output_path}")
 

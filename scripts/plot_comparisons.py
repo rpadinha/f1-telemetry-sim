@@ -56,8 +56,7 @@ def main():
 
     # makes the folder for year_gp_session and puts the comparisons there!
     output_dir = os.path.dirname(path_real) if os.path.dirname(path_real) else "../data"
-    output_dir += "/" + year + "_" + gp_name + "_" + session_type
-
+    
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -136,28 +135,10 @@ def main():
     plt.subplots_adjust(left=0.07, right=0.94, top=0.92, bottom=0.08, hspace=0.1)
     fig2.savefig(os.path.join(output_dir, f"{filename_clean}_inputs.png"), dpi=300, facecolor=fig2.get_facecolor())
 
-    # =========================================================================
-    # PLOT 3: THERMAL DYNAMICS (Tyre Temps)
-    # =========================================================================
-    fig3, ax3 = plt.subplots(1, 1, figsize=(16, 5))
-    fig3.patch.set_facecolor(bg_canvas)
-    apply_style(ax3)
-
-    ax3.plot(distance, df_sim['Tyre_Temp_Front_C'], label="Front Tyres (Sim)", color="#ff9100", linewidth=1.4)
-    ax3.plot(distance, df_sim['Tyre_Temp_Rear_C'], label="Rear Tyres (Sim)", color="#d50000", linewidth=1.4)
-    ax3.axhline(105.0, color="#ffffff", linestyle=":", alpha=0.4, label="Optimal Window (105°C)")
-    ax3.set_ylabel("Tyre Temp (°C)", color="white", fontsize=10)
-    ax3.set_xlabel("Track Distance (m)", color="white", fontsize=11)
-    ax3.set_title(f"{gp_name.capitalize()} TYRE THERMAL DYNAMICS", color="white", fontsize=13, weight="bold")
-    ax3.legend(loc="lower left", facecolor="#1e222d", edgecolor="none", ncol=3)
-
-    plt.subplots_adjust(left=0.07, right=0.94, top=0.88, bottom=0.15)
-    fig3.savefig(os.path.join(output_dir, f"{filename_clean}_thermals.png"), dpi=300, facecolor=fig3.get_facecolor())
-
-    print(f"[PYTHON] 3 Graphs generated successfully in '{output_dir}/' folder:")
+    
+    print(f"[PYTHON] 2 Graphs generated successfully in '{output_dir}/' folder:")
     print(f"[PYTHON] -> {filename_clean}_performance.png")
     print(f"[PYTHON] -> {filename_clean}_inputs.png")
-    print(f"[PYTHON] -> {filename_clean}_thermals.png")
     
 if __name__ == "__main__":
     main()

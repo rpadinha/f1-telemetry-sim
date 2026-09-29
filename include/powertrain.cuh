@@ -15,6 +15,7 @@ __host__ __device__ void update_transmission(F1Car* car) {
         car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f;
     } else if (car->current_gear > 1 && car->rpm < Config::RPM_DOWNSHIFT) {
         car->current_gear--;
+        car->gear_shift_timer = 0.035f;         // 35ms of stop on downshift
         car->rpm = wheel_omega * Config::get_gear_ratio(car->current_gear) * Config::FINAL_DRIVE * 9.5492f;
     }
 }
