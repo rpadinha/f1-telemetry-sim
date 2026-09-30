@@ -48,7 +48,7 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
 
     // Track pitch angle theta = arcsin(delta_z / delta_s)
     dynamics.pitch_angle = get_track_pitch_angle(track, car->current_seg, num_segments);
-
+    
     // Dynamic drag reduction when rear wing slot gap is open
     float current_drag_coef = setup->drag_coef;
     if (car->drs_open) { current_drag_coef *= 0.65f; }
@@ -77,7 +77,7 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     float lat_dir = get_turn_direction(track, car->current_seg, num_segments);
 
     // Centrifugal cornering load: F_lat = (m * v^2) / R
-    dynamics.lateral_force = (dynamics.total_mass * car->v * car->v) / radius;
+    dynamics.lateral_force = (dynamics.total_mass * (car->v * car->v)) / radius;
 
     // assuming track width of 1.6m
     float weight_transfer_lat = (dynamics.lateral_force * Config::GRAVITY_CENTER_HEIGHT) / 1.6f;

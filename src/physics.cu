@@ -12,22 +12,21 @@
 __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
 
     // this should be first
+    // 1. Compute base vehicle dynamics once per dt and store in car->dynamics
     car->dynamics = calculate_car_dynamics(car, setup, track, num_segments);
     // for this get_allowed speed
     float target_speed = get_allowed_speed(car, setup, track, num_segments);
     float speed_error = car->v - target_speed;
 
-    if (speed_error > 0.3f) {
+    if (speed_error > 2.0f) {
         car->action = DriverAction::BRAKE;
-    } else if (car->action == DriverAction::BRAKE && speed_error > -2.0f) {
+    } else if (car->action == DriverAction::BRAKE && speed_error > -0.5f) {
         car->action = DriverAction::COAST;
     } else {
         car->action = DriverAction::ACCELERATE;
     }
-
+    
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
-
-    // 1. Compute base vehicle dynamics once per dt and store in car->dynamics
 
     // 2. Driver & Power Unit updates (populates car->dynamics.desired_engine_force)
     update_driver_pedals(car, setup, track, num_segments, dt);

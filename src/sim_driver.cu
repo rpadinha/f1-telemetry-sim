@@ -60,7 +60,7 @@ __host__ __device__ float get_allowed_speed(const F1Car* car, const CarSetup* se
             // Absolute Physics-Safe Speed Limit
             float corner_v_sq = (future_normal * future_mu * future_radius) / car->dynamics.total_mass;
             float corner_v = sqrtf(corner_v_sq);
-
+            
             // Balanced Deceleration & Braking Profile
             // Using car->v keeps the deceleration profile tied to physical state, not lookahead iteration
             // fixed: evaluate deceleration based on the profile of the target segment's pitch angle
@@ -169,19 +169,21 @@ __host__ __device__ void update_driver_pedals(F1Car* car, const CarSetup* setup,
             
             dynamics.desired_engine_force = compute_drive_force(car, setup, mguk_power);
 
-            float lateral_ratio = 0.0f;
-            if (track[car->current_seg].radius_m < 5000.0f && dynamics.max_grip > 1e-3f) {
-                lateral_ratio = dynamics.lateral_force / dynamics.max_grip;
+            // Full throttle unless rear wheels exceed traction capacity
+            target_throttle = 1.0f;
+            if (dynamics.desired_engine_force > 1e-3f) {
+                float traction_ratio = dynamics.max_traction_force / dynamics.desired_engine_force;
+                if (traction_ratio < 1.0f) {
+                    target_throttle = traction_ratio;
+                }
             }
-
-            target_throttle = 1.0f - lateral_ratio;
-            if (target_throttle > 1.0f) target_throttle = 1.0f;
-            if (target_throttle < 0.0f) target_throttle = 0.0f;
             if (dynamics.desired_engine_force > 1e-3f) {
                 float traction_limited_pedal = dynamics.max_traction_force / dynamics.desired_engine_force;
                 if (traction_limited_pedal > 1.0f) traction_limited_pedal = 1.0f;
                 target_throttle = (traction_limited_pedal < target_throttle) ? traction_limited_pedal : target_throttle;
             }
+            if (target_throttle < 0.0f) { target_throttle = 0.0f; } // limits
+            if (target_throttle > 1.0f) { target_throttle = 1.0f; } // limits
             break;
         }
     }
