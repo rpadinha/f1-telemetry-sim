@@ -55,8 +55,8 @@ int main(int argc, char* argv[]) {
     std::vector<SimResult> results(Config::NUM_SETUPS);
 
     std::mt19937 gen(888); 
-    std::uniform_real_distribution<float> ice_dist(380.0f, 420.0f);
-    std::uniform_real_distribution<float> mguk_dist(300.0f, 350.0f);
+    std::uniform_real_distribution<float> ice_dist(545.0f, 555.0f);
+    std::uniform_real_distribution<float> mguk_dist(110.0f, 130.0f);
     std::uniform_real_distribution<float> drag_dist(0.7f, 1.5f);
 
     for(int i = 0 ; i < Config::NUM_SETUPS ; ++i) {

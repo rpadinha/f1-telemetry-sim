@@ -150,8 +150,8 @@ __host__ __device__ void update_driver_pedals(F1Car* car, const CarSetup* setup,
 
     switch (car->action) {
         case DriverAction::BRAKE: {
-            float kamm_brake_ratio = (dynamics.max_grip > 1e-3f) ? (dynamics.long_grip / dynamics.max_grip) : 1.0f;
-            target_brake = kamm_brake_ratio;
+            float ideal_brake = dynamics.long_grip / Config::MAX_BRAKE_SYSTEM_FORCE;
+            target_brake = ideal_brake;
             if (target_brake > 1.0f) target_brake = 1.0f;
             if (target_brake < 0.15f) target_brake = 0.15f;
 

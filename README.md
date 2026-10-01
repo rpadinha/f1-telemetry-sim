@@ -13,15 +13,12 @@ Designed to process multiple aerodynamic and powertrain configurations concurren
 Right now the program imports and exports data automatically so when you run it, picking a year, grand prix and session(for now only qualifying is suported) it will spew results for the visualization made in SFML and after you close the SFML window, a python script in `scripts/` will plot to the existing data folder already the `.pngs` generated for it here's an example:
 ![plot](./assets/2025_monza_q_performance.png)
 ![plot](./assets/2025_monza_q_inputs.png)
-![plot](./assets/2025_monza_q_thermals.png)
 ![plot](./assets/2025_monza_q_dynamics.png)
 
-The dynamics plot shows us some bugs:
- - Sim Net Longitudinal force and Desired engine force are glued to zero
- - The car thinks all corners are to the right (lmao)
- - High frequency noise in the lateral force
- - we got a lot of overheating in the tyres, huh i dont know how to fix that
- - maybe implement The Magic Formula Tire Model
+This is the last version that will have euler time step integration, in the next commits i will be changing the code from dt timespace into a 3-pass spatial loop.
+The explanation is simple, we are not looking to parallelize sequential time steps, we are looking to use cuda to optimize strategy and car variables that can be optimized. This will make the work more in line with what I had in mind. Changing from a time domain to a spatial domain is the best option due to the fact that a GPU can't parallelize sequential time steps. Our get_allowed_speed function causes throttle/brake oscillation, lateral force noise and artifical overheating.
+In the assets folder will be the last time the code used integration step and will be used to compare against the next version of our code with 3 pass spatial loop integration. bye bye driver bye byeee!!!
+
  
 ### Mathematical Modeling & Physics Formulation
 
