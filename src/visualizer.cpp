@@ -196,6 +196,7 @@ void update_simulation_step(F1Car& car, const CarSetup& setup, const std::vector
                 state.last_lap_time = car.time_s;
                 car.time_s = 0.0f;
                 state.current_lap = car.laps_completed;
+                car.fuel_kg = 6.0f;
                 state.telemetry_trail.clear();
             }
         }

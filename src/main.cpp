@@ -13,6 +13,8 @@
 #include "physics.cuh"              // cudaaaaaa
 #include "config.cuh"               // configs - shared between cuda and here
 #include "circuit_loader.h"         // circuit loader helper for csv handling
+
+/* removed for implementation of 3 spatial loop */
 #include "visualizer.h"             // visualizer (SFML)
 
 int main(int argc, char* argv[]) {
@@ -106,8 +108,6 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error executing export python script.\n";
         return 1;
     }
-
     // sfml visualizer
     run_sfml_visualizer(track, pole_position_setup);
-
 }

@@ -17,10 +17,12 @@ std::vector<TrackSegment> load_circuit_csv(const std::string& filename) {
 
     while (std::getline(file, line)) {
         std::stringstream ss(line);
-        std::string length_str, radius_str, x_str, y_str, z_str, drs_str, speed_str, rpm_str, gear_str, throttle_str, brake_str;
+        std::string length_str, radius_str, pitch_str, turn_str, x_str, y_str, z_str, drs_str, speed_str, rpm_str, gear_str, throttle_str, brake_str;
         
         if (std::getline(ss, length_str, ',') && 
                 std::getline(ss, radius_str, ',') &&
+                std::getline(ss, pitch_str, ',') &&
+                std::getline(ss, turn_str, ',') &&
                 std::getline(ss, x_str, ',') &&
                 std::getline(ss, y_str, ',') && 
                 std::getline(ss, z_str, ',') &&
@@ -35,6 +37,8 @@ std::vector<TrackSegment> load_circuit_csv(const std::string& filename) {
             TrackSegment seg;
             seg.length_m = std::stof(length_str);
             seg.radius_m = std::stof(radius_str);
+            seg.pitch_angle = std::stof(pitch_str);
+            seg.turn_direction = std::stof(turn_str);
             seg.x = std::stof(x_str);
             seg.y = std::stof(y_str);
             seg.z = std::stof(z_str);

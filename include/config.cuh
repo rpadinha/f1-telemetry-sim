@@ -23,6 +23,7 @@ namespace Config {
     constexpr float GRAVITY_CENTER_HEIGHT = 0.30f;      // Gravity center height of the f1 car (m)
     constexpr float FUEL_FLOW_KG_S = 100.0f / 3600.0f;  // max fuel flow (Kg/s)
 
+    // this should be applied in the setup and not here!
     // Gear Ratios and RPM Limits
     // so here we got error: identifier "Config::GEAR_RATIOS" is undefined in device code
     /*constexpr float GEAR_RATIOS[8] = {3.2f, 2.6f, 2.1f, //
@@ -41,9 +42,9 @@ namespace Config {
     constexpr float RPM_REDLINE = 12800.0f;             // Redline RPM of the car // wowzers
     constexpr float RPM_UPSHIFT = 11300.0f;            // Ideal upshift RPM of the car
     constexpr float RPM_DOWNSHIFT = 7000.0f;            // Ideal downshift RPM of the car
-    constexpr float PEAK_POWER_RPM = 10500.0f;          // RPM at which the car produces peak power
+    constexpr float PEAK_POWER_RPM = 10700.0f;          // RPM at which the car produces peak power
     constexpr float RPM_IDLE = 5000.f;                  // RPM idle
-    constexpr float MAX_ENGINE_BRAKING = 1500.0f;       // Engine braking max force
+    constexpr float MAX_ENGINE_BRAKING = 2500.0f;       // Engine braking max force
 
     // Tyres Things
     /* Here we will have to do the same we did above as we need to return values according
@@ -66,12 +67,12 @@ namespace Config {
     }
 
     // pacejka constantes for slick tyres in F1 (maybe we can optimize this?) with setups
-    constexpr float PACEJKA_C = 1.2f;                   // shape factor
-    constexpr float PACEJKA_B = 14.0f;                  // rigid factor of the tyre
-
+    constexpr float PACEJKA_C = 1.4f;                   // shape factor
+    constexpr float PACEJKA_B = 19.0f;                  // rigid factor of the tyre
+    
     // track and ambient
     constexpr float AMBIENT_TEMP_C = 25.0f;             // ambient temperature (Cº)
-    constexpr float TRACK_TEMP_C = 42.0f;               // track temperture (Cº)
+    constexpr float TRACK_TEMP_C = 30.0f;               // track temperture (Cº)
 
     // ERS System (MGU-K)
     constexpr float MAX_BATTERY_MJ = 4.0f;              // Maximum battery capacity (MJ)
@@ -80,7 +81,7 @@ namespace Config {
     // Simulation Parameters
     constexpr int LOOKAHEAD_METERS = 100;               // Lookahead distance (m)
     constexpr float PHYSICS_DT = 0.002f;                // Physics timestep (s)
-    constexpr int NUM_SETUPS = 100;                    // Number of setups to simulate
+    constexpr int NUM_SETUPS = 100;                     // Number of setups to simulate
 }
 
 #endif

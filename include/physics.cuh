@@ -117,6 +117,8 @@ struct F1Car {
 struct TrackSegment {
     float length_m;                     // Length of the segment
     float radius_m;                     // Radius of the segment (< 10000 means curvature)
+    float pitch_angle;                  // also calculated in python
+    float turn_direction;               // already calculated in python
     float x;                            // x of segment
     float y;                            // y of segment
     float z;                            // z of segment
@@ -149,7 +151,12 @@ struct TelemetryPoint {
     float tyre_temp_fr;
     float tyre_temp_rl;
     float tyre_temp_rr;
-    
+
+    float tyre_wear_fl;
+    float tyre_wear_fr;
+    float tyre_wear_rl;
+    float tyre_wear_rr;
+
     float total_mass;
     float pitch_angle;
     float normal_force;

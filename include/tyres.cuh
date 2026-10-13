@@ -21,12 +21,6 @@ __host__ __device__ inline float calculate_tyre_grip(TyreCompound compound, floa
     return properties.base_grip * eta_temp * eta_wear;
 }
 
-__host__ __device__ inline float calculate_effective_grip(const F1Car* car) {
-    float avg_temp = (car->tyre_temp_fl + car->tyre_temp_fr + car->tyre_temp_rl + car->tyre_temp_rr) * 0.25f;
-    float avg_wear = (car->tyre_wear_fl + car->tyre_wear_fr + car->tyre_wear_rl + car->tyre_wear_rr) * 0.25f;
-    return calculate_tyre_grip(car->current_compound, avg_temp, avg_wear);
-}
-
 __host__ __device__ inline float calculate_slip_angle(float f_lat, float max_grip) {
     if (max_grip <= 1e-3f) return 0.0f;
 
@@ -80,7 +74,7 @@ __host__ __device__ inline void update_tyres(F1Car* car, float dt) {
 
         // 5. Thermal equilibrium: track conduction & convective air cooling
         float q_track = 0.012f * (Config::TRACK_TEMP_C - *temps[i]);
-        float cool    = 0.0022f * sqrtf(car->v + 1.0f) * (*temps[i] - Config::AMBIENT_TEMP_C);
+        float cool    = 0.0018f * sqrtf(car->v + 1.0f) * (*temps[i] - Config::AMBIENT_TEMP_C);
 
         *temps[i] += (heat_friction + heat_carcass + q_track - cool) * dt;
         if (*temps[i] < Config::AMBIENT_TEMP_C) *temps[i] = Config::AMBIENT_TEMP_C;
@@ -94,7 +88,7 @@ __host__ __device__ inline void update_tyres(F1Car* car, float dt) {
 
 // Load Degressivity (instead of grip growing perfectly linear with vertical load)
 __host__ __device__ inline float apply_load_sensitivity(float base_mu, float normal_force, float nominal_load_per_tyre) {
-    constexpr float LOAD_SENSITIVITY = 0.000012f;
+    constexpr float LOAD_SENSITIVITY = 0.000014f;
     float delta_load = normal_force - nominal_load_per_tyre;
     if (delta_load < 0.0f) delta_load = 0.0f;
     return base_mu / (1.0f + LOAD_SENSITIVITY * delta_load);

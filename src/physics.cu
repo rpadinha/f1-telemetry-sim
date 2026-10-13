@@ -5,22 +5,23 @@
 #include "config.cuh"               // gives acess to global config variables
 #include "engine.cuh"               // gives acess to engine functions
 #include "powertrain.cuh"           // gives acess to powertrain functions
-#include "tyres.cuh"                // gives acess to tyres functions
-#include "math_utils.cuh"           // Gives acess to math functions needed
+#include "chassis.cuh"              // math_utils turned into this
 #include "sim_driver.cuh"           // gives acess to sim driver
 
 __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments, float dt) {
 
     // this should be first
     // 1. Compute base vehicle dynamics once per dt and store in car->dynamics
-    car->dynamics = calculate_car_dynamics(car, setup, track, num_segments);
+    car->dynamics = calculate_car_dynamics(car, setup, &track[car->current_seg]);
     // for this get_allowed speed
     float target_speed = get_allowed_speed(car, setup, track, num_segments);
     float speed_error = car->v - target_speed;
 
     if (speed_error > 2.0f) {
         car->action = DriverAction::BRAKE;
-    } else if (car->action == DriverAction::BRAKE && speed_error > -0.5f) {
+    } else if (car->action == DriverAction::BRAKE && speed_error > -1.0f) {
+        car->action = DriverAction::COAST;
+    } else if (speed_error > -1.5f) {                      
         car->action = DriverAction::COAST;
     } else {
         car->action = DriverAction::ACCELERATE;
@@ -29,7 +30,7 @@ __host__ __device__ void step_physics(F1Car* car, const CarSetup* setup, const T
     car->drs_open = (track[car->current_seg].drs_zone && car->action == DriverAction::ACCELERATE);
 
     // 2. Driver & Power Unit updates (populates car->dynamics.desired_engine_force)
-    update_driver_pedals(car, setup, track, num_segments, dt);
+    update_driver_pedals(car, setup, track, num_segments, target_speed, dt);
     update_ers(car, setup, track, num_segments, dt);
     burn_fuel(car, car->throttle_pedal, dt);
 
@@ -73,12 +74,13 @@ __global__ void simulate_lap(const CarSetup* setups, SimResult* results, int num
         car.battery_mj = 4.0f;
         car.fuel_kg = 6.0f;
         car.current_gear = track[0].real_gear;
+        car.rpm = track[0].real_rpm;
         car.gear_shift_timer = 0.0f;
         car.current_compound = TyreCompound::C3;
-        car.tyre_temp_fl = 95.0f;
-        car.tyre_temp_fr = 95.0f;
-        car.tyre_temp_rl = 95.0f;
-        car.tyre_temp_rr = 95.0f;
+        car.tyre_temp_fl = 85.0f;
+        car.tyre_temp_fr = 85.0f;
+        car.tyre_temp_rl = 85.0f;
+        car.tyre_temp_rr = 85.0f;
         car.tyre_wear_fl = 0.0f;
         car.tyre_wear_fr = 0.0f;
         car.tyre_wear_rl = 0.0f;
@@ -159,6 +161,11 @@ __global__ void record_pole_telemetry(CarSetup setup, const TrackSegment* track,
             pt.tyre_temp_fr = car.tyre_temp_fr;
             pt.tyre_temp_rl = car.tyre_temp_rl;
             pt.tyre_temp_rr = car.tyre_temp_rr;
+
+            pt.tyre_wear_fl = car.tyre_wear_fl;
+            pt.tyre_wear_fr = car.tyre_wear_fr;
+            pt.tyre_wear_rl = car.tyre_wear_rl;
+            pt.tyre_wear_rr = car.tyre_wear_rr;
 
             pt.total_mass           = dyn.total_mass;
             pt.pitch_angle          = dyn.pitch_angle;
@@ -247,7 +254,7 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
          << "Tyre_Temp_FL_C,Tyre_Temp_FR_C,Tyre_Temp_RL_C,Tyre_Temp_RR_C,"
          << "Total_Mass_kg,Pitch_Angle_rad,Drag_Force_N,Downforce_N,Normal_Force_N,Lateral_Force_N,Gravity_Long_N,"
          << "Max_Grip_N,Long_Grip_N,Max_Traction_N,Engine_Braking_N,Desired_Engine_N,Slip_Angle,Drag_Corner,"
-         << "Applied_Long_Force_N,Load_FL_N,Load_FR_N,Load_RL_N,Load_RR_N\n";
+         << "Applied_Long_Force_N,Load_FL_N,Load_FR_N,Load_RL_N,Load_RR_N,Tyre_Wear_FL,Tyre_Wear_FR,Tyre_Wear_RL,Tyre_Wear_RR\n";
 
     for (int i = 0; i < num_segments; ++i) {
         const TelemetryPoint& pt = h_telemetry[i];
@@ -263,7 +270,9 @@ void export_simulated_telemetry(const CarSetup& best_setup, const TrackSegment* 
              << pt.max_traction_force << "," << pt.engine_braking_force << ","
              << pt.desired_engine_force << "," << pt.slip_angle_rad << ","
              << pt.cornering_drag << "," << pt.applied_long_force << ","
-             << pt.load_fl << "," << pt.load_fr << "," << pt.load_rl << "," << pt.load_rr << "\n";
+             << pt.load_fl << "," << pt.load_fr << "," << pt.load_rl << "," << pt.load_rr << ","
+             << pt.tyre_wear_fl << "," << pt.tyre_wear_fr << "," 
+             << pt.tyre_wear_rl << "," << pt.tyre_wear_rr << "\n";
     }
 
     file.close();

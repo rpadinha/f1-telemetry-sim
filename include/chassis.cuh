@@ -1,63 +1,28 @@
-#ifndef MATH_UTILS_CUH
-#define MATH_UTILS_CUH
+#ifndef CHASSIS_CUH
+#define CHASSIS_CUH
 
 #include <math.h>
 #include "config.cuh"
 #include "physics.cuh"
 #include "engine.cuh"
 #include "tyres.cuh"
+#include "aero.cuh"
 
-__host__ __device__ inline bool is_straight(float radius_m, const CarSetup* setup) {
-    return radius_m >= 1000.f;
+__host__ __device__ inline bool is_straight(float radius_m) {
+    return radius_m >= 1800.f;
 }
 
-__host__ __device__ inline float get_track_pitch_angle(const TrackSegment* track, int current_seg, int num_segments) {
-    int next_seg = (current_seg + 1) % num_segments;
-    float delta_z = track[next_seg].z - track[current_seg].z;
-    float seg_length = track[current_seg].length_m; // this is always 1.0f;
-
-    if (seg_length<=0.0f) return 0.0f;
-
-    float ratio = delta_z / seg_length;
-    if (ratio>1.0f) ratio = 1.0f;
-    if (ratio<-1.0f)ratio = -1.0f;
-
-    // asinf is a CUDA functon to calculate arcsen of a float number
-    return asinf(ratio);
-}
-
-// Returns +1.0f for right turn (weight shifts left), -1.0f for left turn (weight shifts right)
-__host__ __device__ inline float get_turn_direction(const TrackSegment* track, int current_seg, int num_segments) {
-    int prev_seg = (current_seg - 2 + num_segments) % num_segments;
-    int next_seg = (current_seg + 2 + num_segments) % num_segments;
-
-    float dx1 = track[current_seg].x - track[prev_seg].x;
-    float dy1 = track[current_seg].y - track[prev_seg].y;
-    float dx2 = track[next_seg].x - track[current_seg].x;
-    float dy2 = track[next_seg].y - track[current_seg].y;
-
-    float cross_z = (dx1 * dy2) - (dy1 * dx2);
-    return (cross_z < 0.0f) ? 1.0f : -1.0f;
-}
-
-__host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car, const CarSetup* setup, const TrackSegment* track, int num_segments) {
+__host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car, const CarSetup* setup, const TrackSegment* track_seg) {
     F1CarDynamics dynamics;
 
     // Full weight
     dynamics.total_mass = car->fuel_kg + setup->mass_kg;
 
-    // Track pitch angle theta = arcsin(delta_z / delta_s)
-    dynamics.pitch_angle = get_track_pitch_angle(track, car->current_seg, num_segments);
+    dynamics.pitch_angle = track_seg->pitch_angle;
     
-    // Dynamic drag reduction when rear wing slot gap is open
-    float current_drag_coef = setup->drag_coef;
-    if (car->drs_open) { current_drag_coef *= 0.65f; }
-    dynamics.drag_force = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * current_drag_coef * Config::FRONTAL_AREA;
+    // Calcula Aero (Drag e Downforce preenchem a struct)
+    calculate_aerodynamics(&dynamics, car->v, setup, car->drs_open);
     
-    // F_downforce = 0.5 * rho * v^2 * Cl * A (where Cl * A ~= 3.0 * Cd * A)
-    float cl_a = (setup->drag_coef * 3.0f) * Config::FRONTAL_AREA;
-    dynamics.downforce = 0.5f * Config::AIR_DENSITY * (car->v * car->v) * cl_a;
-
     // Base static gravity load perpendicular to the road: F_normal,static = m * g * cos(theta)
     float static_normal = dynamics.total_mass * Config::GRAVITY * cosf(dynamics.pitch_angle);
     dynamics.normal_force = static_normal + dynamics.downforce;
@@ -72,11 +37,11 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     if (front_force < 0.0f) front_force = 0.0f;
     if (rear_force < 0.0f) rear_force = 0.0f;
 
-    // Direct radius lookup from the track segment
-    float radius = track[car->current_seg].radius_m;
-    float lat_dir = get_turn_direction(track, car->current_seg, num_segments);
+    float radius = track_seg->radius_m;
+    float lat_dir = track_seg->turn_direction;
 
     // Centrifugal cornering load: F_lat = (m * v^2) / R
+    // radius might be making bad calculations
     dynamics.lateral_force = (dynamics.total_mass * (car->v * car->v)) / radius;
 
     // assuming track width of 1.6m
@@ -107,29 +72,27 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
 
     dynamics.max_grip = grip_fl + grip_fr + grip_rl + grip_rr;
 
-    // pretection against the physics limit, sbins and lateral force hits the limit
+    /* protection against the physics limit, sbins and lateral force hits the limit
     if (dynamics.lateral_force > dynamics.max_grip) {
         dynamics.lateral_force = dynamics.max_grip;
     }
-
+    */
+   
     dynamics.slip_angle_rad = calculate_slip_angle(dynamics.lateral_force, dynamics.max_grip);
     dynamics.cornering_drag = dynamics.lateral_force * sinf(dynamics.slip_angle_rad);
 
     // Kamm Circle: Flong_grip = sqrtf(F_gripmax² - Flat²)
-    float diff = (dynamics.max_grip * dynamics.max_grip) - (dynamics.lateral_force * dynamics.lateral_force);
-    dynamics.long_grip = sqrtf(fmaxf(0.0f, diff));
+    float long_grip_diff = (dynamics.max_grip * dynamics.max_grip) - (dynamics.lateral_force * dynamics.lateral_force);
+    dynamics.long_grip = sqrtf(fmaxf(0.0f, long_grip_diff));
 
     // For F1 only Rear tyres accel so f1 is rwd so grip all rear lmao
     float rear_max_grip = grip_rl + grip_rr;
-    float rear_lat_ratio = (dynamics.normal_force > 0.0f) ? ((dynamics.load_rl + dynamics.load_rr) / dynamics.normal_force) : 0.55f;
+    float rear_lat_ratio = ((dynamics.load_rl + dynamics.load_rr) / dynamics.normal_force);
     float rear_lateral_force = dynamics.lateral_force * rear_lat_ratio;
 
     // Maximum traction force limited by dynamic rear vertical load
-    if (rear_max_grip > rear_lateral_force) {
-        dynamics.max_traction_force = sqrtf((rear_max_grip * rear_max_grip) - (rear_lateral_force * rear_lateral_force));
-    } else {
-        dynamics.max_traction_force = 0.0f;
-    }
+    float max_traction_diff = (rear_max_grip * rear_max_grip) - (rear_lateral_force * rear_lateral_force);
+    dynamics.max_traction_force = sqrtf(fmaxf(0.0f, max_traction_diff));
 
     // Longitudinal gravity: F_gravity,long = -m * g * sin(theta)
     dynamics.gravity_longitudinal = -dynamics.total_mass * Config::GRAVITY * sinf(dynamics.pitch_angle);
@@ -138,6 +101,7 @@ __host__ __device__ inline F1CarDynamics calculate_car_dynamics(const F1Car* car
     dynamics.engine_braking_force = get_engine_braking_force(car->rpm);
     dynamics.applied_long_force = 0.0f;
     dynamics.desired_engine_force = 0.0f;
+    
     return dynamics;
 }
 
@@ -147,8 +111,7 @@ __host__ __device__ inline float compute_net_force(const F1Car* car) {
 
     switch (car->action) {
         case DriverAction::BRAKE: {
-            float requested_brake = car->brake_pedal * Config::MAX_BRAKE_SYSTEM_FORCE;
-            float applied_brake_force = (requested_brake > dynamics.long_grip) ? dynamics.long_grip : requested_brake;
+            float applied_brake_force = car->brake_pedal * Config::MAX_BRAKE_SYSTEM_FORCE;
 
             net_force = -applied_brake_force - dynamics.drag_force - dynamics.cornering_drag - dynamics.engine_braking_force + dynamics.gravity_longitudinal;
             break;
@@ -158,11 +121,7 @@ __host__ __device__ inline float compute_net_force(const F1Car* car) {
             break;
         }
         case DriverAction::ACCELERATE: {
-            float requested_engine = car->throttle_pedal * dynamics.desired_engine_force;
-            float applied_engine_force = (requested_engine > dynamics.max_traction_force) 
-                                       ? dynamics.max_traction_force 
-                                       : requested_engine;
-
+            float applied_engine_force = car->throttle_pedal * dynamics.desired_engine_force;
             net_force = applied_engine_force - dynamics.drag_force - dynamics.cornering_drag + dynamics.gravity_longitudinal;
             break;
         }
